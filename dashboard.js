@@ -1,0 +1,827 @@
+/**
+ * ============================================================
+ *  FORTIS VASTGOED — DASHBOARD RENDERER
+ *  Leest uit ENGINE, rendert alle views.
+ *  Je hoeft dit NIET aan te passen.
+ * ============================================================
+ */
+
+const E = window.ENGINE;
+const D = window.FORTIS_DATA;
+const MND = E.maandLabels(24);
+
+// ---- NAVIGATIE ----
+function nav(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+  // Lazy-build charts when page is first visited
+  const builders = {
+    liq: buildLiq,
+    portfolio: buildPortfolio,
+    timeline: buildTimeline,
+    scenario: buildScenario,
+    financiering: buildFinanciering,
+    covenant: buildCovenant,
+    valuation: buildValuation,
+    ownership: buildOwnership,
+    equity: buildEquity,
+    exit: buildExit,
+  };
+  if (builders[id] && !el.dataset.built) {
+    builders[id]();
+    el.dataset.built = '1';
+  }
+}
+
+// ---- HELPERS ----
+const badge = (txt, cls) => `<span class="badge badge-${cls}">${txt}</span>`;
+const kpi = (label, val, sub, colorCls = '') =>
+  `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value ${colorCls}">${val}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
+const alertEl = (level, txt) => {
+  const map = { kritiek: ['alert-red', 'dot-red'], aandacht: ['alert-amber', 'dot-amber'], info: ['alert-blue', 'dot-blue'], ok: ['alert-green', 'dot-green'] };
+  const [ac, dc] = map[level] || map.info;
+  return `<div class="alert ${ac}"><div class="alert-dot ${dc}"></div><div>${txt}</div></div>`;
+};
+const statusBadge = s => {
+  const m = { eigendom: 'green', herfi: 'blue', bouw: 'amber', acquisitie: 'purple', verkoop: 'red', lopend: 'blue' };
+  return badge(s, m[s] || 'gray');
+};
+const certBadge = c => c === 'committed'
+  ? badge('Committed', 'green')
+  : c === 'expected' ? badge('Expected', 'amber') : badge('Oriëntatie', 'gray');
+
+// ---- INIT: META & EXECUTIVE ----
+(function initExec() {
+  document.getElementById('sb-naam').textContent = D.meta.bedrijfsnaam;
+  document.title = D.meta.bedrijfsnaam + ' — Dashboard';
+  document.getElementById('exec-title').textContent = 'Executive overzicht — ' + D.meta.bedrijfsnaam;
+  document.getElementById('exec-sub').textContent =
+    `${D.objecten.length} objecten · ${D.eigenaren.length} eigenaren · Peildatum ${D.meta.peildatum}`;
+
+  const totKas = E.totaleKas();
+  const cfBase = E.cashflowForecast(24, 'base');
+  const minKas = Math.min(...cfBase.map(m => m.sluitend_kas));
+  const minM = MND[cfBase.findIndex(m => m.sluitend_kas === minKas)];
+  const totSch = E.totaleSculd();
+  const navVal = E.nav();
+  const eqCalls = E.gewogenEquityCall();
+
+  document.getElementById('exec-kpis').innerHTML = [
+    kpi('Kasaldo vandaag', E.fmt(totKas), 'Over ' + D.kasstand.length + ' entiteiten', 'kv-blue'),
+    kpi('Min. kasaldo 12m', E.fmt(minKas), minM + ' — ' + (minKas < D.meta.minimum_kas_drempel * 1.5 ? 'aandacht' : 'ok'), minKas < D.meta.minimum_kas_drempel ? 'kv-red' : 'kv-amber'),
+    kpi('NAV portefeuille', E.fmt(navVal), 'Marktwaarde − schuld', 'kv-green'),
+    kpi('Equity calls 12m', E.fmt(eqCalls), D.transacties.filter(t => t.type === 'equity_call').length + ' geplande calls', 'kv-red'),
+    kpi('Totale NOI/jaar', E.fmt(E.totalNOI()), D.huurcontracten.length + ' actieve huurcontracten'),
+    kpi('DSCR portefeuille', E.dscr().toFixed(2), 'Min. eis banken: 1,20', E.dscr() >= 1.4 ? 'kv-green' : E.dscr() >= 1.2 ? 'kv-amber' : 'kv-red'),
+    kpi('Totale schuld', E.fmt(totSch), 'LTV gew. gem. ' + E.gewogenLTV().toFixed(0) + '%', 'kv-red'),
+    kpi('Exitwaarde (base)', E.fmt(E.totaleWaarde()), 'Equity + premium', 'kv-green'),
+  ].join('');
+
+  // Alerts
+  const alerts = E.generateAlerts();
+  document.getElementById('exec-alerts').innerHTML = (alerts.length
+    ? alerts.map(a => alertEl(a.niveau, a.tekst))
+    : [alertEl('ok', 'Geen kritieke meldingen op dit moment.')]
+  ).join('');
+
+  // Pipeline table
+  const tx = E.gewogenTransacties();
+  document.getElementById('exec-pipeline').innerHTML = `
+    <thead><tr><th>Event</th><th>Project</th><th>Datum</th><th>Bedrag</th><th>Prob.</th><th>Gewogen</th><th>Status</th></tr></thead>
+    <tbody>${tx.map(t => {
+    const obj = D.objecten.find(o => o.id === t.object_id);
+    const pos = t.bedrag >= 0;
+    return `<tr>
+      <td>${t.naam}</td>
+      <td>${obj ? obj.naam : '—'}</td>
+      <td>${t.verwachte_datum.substring(0, 7)}</td>
+      <td class="num ${pos ? 'green' : 'red'}">${E.fmt(t.bedrag)}</td>
+      <td class="num">${t.kans_pct}%</td>
+      <td class="num ${pos ? 'green' : 'red'}">${E.fmt(t.gewogen_bedrag)}</td>
+      <td>${certBadge(t.zekerheid)}</td>
+    </tr>`;
+  }).join('')}</tbody>`;
+
+  buildExChart('base');
+})();
+
+// ---- EXECUTIVE CHART ----
+let exC = null;
+function buildExChart(scen) {
+  const data = {
+    base: { d: E.cashflowForecast(24, 'base').map(m => m.sluitend_kas), c: '#1a5fa8', f: 'rgba(26,95,168,0.07)' },
+    up: { d: E.cashflowForecast(24, 'upside').map(m => m.sluitend_kas), c: '#2d7a4f', f: 'rgba(45,122,79,0.07)' },
+    dn: { d: E.cashflowForecast(24, 'downside').map(m => m.sluitend_kas), c: '#c0392b', f: 'rgba(192,57,43,0.07)' },
+  }[scen];
+  if (exC) exC.destroy();
+  exC = new Chart(document.getElementById('exChart'), {
+    type: 'line',
+    data: { labels: MND, datasets: [{ data: data.d, borderColor: data.c, backgroundColor: data.f, borderWidth: 2, fill: true, tension: 0.35, pointRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82', maxTicksLimit: 8 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => '€' + (v / 1e6).toFixed(1) + 'M' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+  });
+}
+function setExScen(s, btn) {
+  document.querySelectorAll('#page-exec .tab-btn').forEach(b => b.className = 'tab-btn');
+  btn.className = 'tab-btn active-' + (s === 'base' ? 'base' : s === 'up' ? 'up' : 'down');
+  buildExChart(s);
+}
+
+// ---- LIQUIDITEIT ----
+let liqC = null;
+function buildLiq() {
+  const base = E.cashflowForecast(24, 'base');
+  const minKas = Math.min(...base.map(m => m.sluitend_kas));
+  const schulddienst = E.maandelijkseSchulddienst();
+  const cfDn = E.cashflowForecast(24, 'downside');
+  const gapDn = Math.min(...cfDn.map(m => m.sluitend_kas));
+
+  document.getElementById('liq-kpis').innerHTML = [
+    kpi('Opening cash', E.fmt(E.totaleKas()), D.meta.peildatum, 'kv-blue'),
+    kpi('Min. kasaldo (24m)', E.fmt(minKas), 'Base scenario', minKas < D.meta.minimum_kas_drempel ? 'kv-red' : 'kv-amber'),
+    kpi('Funding gap (downside)', E.fmt(Math.min(0, gapDn)), gapDn < 0 ? 'Downside scenario' : 'Geen gap', gapDn < 0 ? 'kv-red' : 'kv-green'),
+    kpi('Maandlast schulddienst', E.fmt(schulddienst), 'Rente + aflossing', 'kv-red'),
+  ].join('');
+
+  buildLiqChart('base');
+
+  // Cashflow table
+  const thead = `<thead><tr><th>Maand</th><th>Huur</th><th>Fin./herfi</th><th>Aankoop/EC</th><th>R+A</th><th>OpEx</th><th>Netto CF</th><th>Kasaldo</th><th></th></tr></thead>`;
+  const rows = base.slice(0, 12).map(m => {
+    const inc_in = m.incidenteel > 0 ? E.fmt(m.incidenteel) : '—';
+    const inc_out = m.incidenteel < 0 ? E.fmt(m.incidenteel) : '—';
+    return `<tr>
+      <td>${MND[m.maand]}</td>
+      <td class="num green">${E.fmt(m.huur)}</td>
+      <td class="num green">${inc_in}</td>
+      <td class="num red">${inc_out}</td>
+      <td class="num red">${E.fmt(-m.schulddienst)}</td>
+      <td class="num red">${E.fmt(-m.kosten)}</td>
+      <td class="num ${m.netto_cf < 0 ? 'red' : 'green'}">${E.fmt(m.netto_cf)}</td>
+      <td class="num ${m.sluitend_kas < D.meta.minimum_kas_drempel ? 'red' : m.sluitend_kas < D.meta.minimum_kas_drempel * 2 ? 'amber' : ''}">${E.fmt(m.sluitend_kas)}</td>
+      <td>${m.alert ? badge('Alert', 'red') : ''}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('liq-tbl').innerHTML = thead + `<tbody>${rows}</tbody>`;
+
+  // Cash per entiteit
+  const kas = E.kasPerEntiteit();
+  document.getElementById('liq-entiteiten').innerHTML = `
+    <thead><tr><th>Entiteit</th><th>Totale kas</th><th>Restricted</th><th>Beschikbaar</th><th>Reden</th><th>Dividend mogelijk</th></tr></thead>
+    <tbody>${kas.map(k => `<tr>
+      <td style="font-weight:600">${k.entiteit}</td>
+      <td class="num">${E.fmt(k.saldo)}</td>
+      <td class="num red">${k.restricted > 0 ? E.fmt(k.restricted) : '—'}</td>
+      <td class="num ${k.beschikbaar > 0 ? 'green' : 'red'}">${E.fmt(k.beschikbaar)}</td>
+      <td style="color:var(--text-2)">${k.toelichting || '—'}</td>
+      <td>${k.beschikbaar > 0 ? badge('Ja', 'green') : badge('Nee', 'red')}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+function buildLiqChart(scen) {
+  const base = E.cashflowForecast(24, 'base').map(m => m.sluitend_kas);
+  const dn = E.cashflowForecast(24, 'downside').map(m => m.sluitend_kas);
+  const up = E.cashflowForecast(24, 'upside').map(m => m.sluitend_kas);
+  const thresh = new Array(24).fill(D.meta.minimum_kas_drempel);
+  const selected = scen === 'up' ? up : scen === 'dn' ? dn : base;
+  const colors = { base: '#1a5fa8', up: '#2d7a4f', dn: '#c0392b' };
+  const col = colors[scen] || '#1a5fa8';
+  if (liqC) liqC.destroy();
+  liqC = new Chart(document.getElementById('liqChart'), {
+    type: 'line',
+    data: { labels: MND, datasets: [
+      { label: 'Kasverloop', data: selected, borderColor: col, backgroundColor: col + '11', borderWidth: 2, fill: true, tension: 0.35, pointRadius: 2 },
+      { label: 'Min. drempel', data: thresh, borderColor: '#c0392b', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82', maxTicksLimit: 10 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => E.fmt(v) }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+  });
+}
+function setLiqScen(s, btn) {
+  document.querySelectorAll('#page-liq .tab-btn').forEach(b => b.className = 'tab-btn');
+  btn.className = 'tab-btn active-' + (s === 'base' ? 'base' : s === 'up' ? 'up' : 'down');
+  buildLiqChart(s);
+}
+
+// ---- PORTFOLIO ----
+function buildPortfolio() {
+  const nois = E.noiPerObject();
+  const ltvs = E.ltvPerObject();
+  const totMW = E.totaleMarktwaarde();
+
+  document.getElementById('port-sub').textContent = `${D.objecten.length} objecten · ${D.huurcontracten.length} huurcontracten · Peildatum ${D.meta.peildatum}`;
+  document.getElementById('port-kpis').innerHTML = [
+    kpi('Totale marktwaarde', E.fmt(totMW), D.objecten.length + ' objecten', 'kv-blue'),
+    kpi('Totale huur/jaar', E.fmt(E.jaarlijkseHuur()), D.huurcontracten.length + ' contracten', 'kv-green'),
+    kpi('Totale NOI/jaar', E.fmt(E.totalNOI()), 'Na exploitatiekosten', 'kv-green'),
+    kpi('Gem. yield', E.pct(E.totalNOI() / totMW * 100), 'Op marktwaarde'),
+  ].join('');
+
+  const rows = nois.map(obj => {
+    const ltv = ltvs.find(l => l.id === obj.id);
+    const huur_mnd = D.huurcontracten.filter(h => h.object_id === obj.id).reduce((s, h) => s + h.huur_per_maand, 0);
+    const schuld = ltv?.schuld || 0;
+    const ltvPct = ltv?.ltv;
+    const ltvCls = ltvPct ? (ltvPct > 70 ? 'red' : ltvPct > 60 ? 'amber' : '') : '';
+    return `<tr>
+      <td style="font-weight:600">${obj.naam}</td>
+      <td>${obj.stad}</td>
+      <td>${obj.type}</td>
+      <td>${statusBadge(obj.status)}</td>
+      <td class="num">${E.fmt(obj.marktwaarde)}</td>
+      <td class="num">${huur_mnd > 0 ? E.fmt(huur_mnd) : '—'}</td>
+      <td class="num green">${obj.noi > 0 ? E.fmt(obj.noi) : '—'}</td>
+      <td class="num red">${schuld > 0 ? E.fmt(schuld) : '—'}</td>
+      <td class="num ${ltvCls}">${ltvPct ? ltvPct.toFixed(0) + '%' : '—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('port-tbl').innerHTML = `
+    <thead><tr><th>Object</th><th>Stad</th><th>Type</th><th>Status</th><th>Waarde</th><th>Huur/mnd</th><th>NOI/jr</th><th>Schuld</th><th>LTV</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+
+  // Charts
+  const verhuurde = nois.filter(o => o.noi > 0);
+  new Chart(document.getElementById('noiChart'), {
+    type: 'bar',
+    data: { labels: verhuurde.map(o => o.naam.split(' ')[0]), datasets: [{ data: verhuurde.map(o => Math.round(o.noi / 1000)), backgroundColor: '#85B7EB', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82' }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => v + 'k' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+  });
+
+  const metLTV = ltvs.filter(o => o.ltv !== null);
+  new Chart(document.getElementById('ltvChart'), {
+    type: 'bar',
+    data: { labels: metLTV.map(o => o.naam.split(' ')[0]), datasets: [{ data: metLTV.map(o => Math.round(o.ltv)), backgroundColor: metLTV.map(o => o.ltv > 70 ? '#F09595' : o.ltv > 60 ? '#FAC775' : '#97C459'), borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82' }, grid: { display: false } }, y: { min: 0, max: 90, ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+  });
+}
+
+// ---- TIMELINE ----
+function buildTimeline() {
+  const MONTHS = 24;
+  const CW = 30, LW = 140;
+  const types = [
+    { key: 'financiering', label: 'Financiering', color: '#B5D4F4', tc: '#0C447C' },
+    { key: 'herfinanciering', label: 'Herfinanciering', color: '#5DCAA5', tc: '#085041' },
+    { key: 'huur', label: 'Huur/exploitatie', color: '#97C459', tc: '#27500A' },
+    { key: 'bouw', label: 'Bouw', color: '#EF9F27', tc: '#412402' },
+    { key: 'equity_call', label: 'Equity call', color: '#E24B4A', tc: '#501313' },
+    { key: 'acquisitie', label: 'Acquisitie', color: '#AFA9EC', tc: '#26215C' },
+  ];
+
+  document.getElementById('gantt-legend').innerHTML = types.map(t =>
+    `<span style="display:flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block"></span>${t.label}</span>`
+  ).join('');
+
+  const startDate = new Date(D.meta.peildatum + '-01');
+  function maandIndex(dateStr) {
+    const d = new Date(dateStr.substring(0, 7) + '-01');
+    return Math.round((d - startDate) / (1000 * 60 * 60 * 24 * 30));
+  }
+
+  const ganttRows = [
+    { label: 'Alle huurinkomsten', bars: [{ m: 0, d: 24, ...types[2] }] },
+    ...D.objecten.filter(o => o.status === 'herfi').map(o => ({
+      label: o.naam,
+      bars: [{ m: 0, d: 3, ...types[0] }, { m: 3, d: 21, ...types[1] }],
+    })),
+    ...D.objecten.filter(o => o.status === 'bouw').map(o => {
+      const eind = o.verwachte_opleveringsdatum ? maandIndex(o.verwachte_opleveringsdatum) : 18;
+      return { label: o.naam, bars: [{ m: 0, d: eind, ...types[3] }, { m: eind, d: 24 - eind, ...types[2] }] };
+    }),
+    ...D.transacties.filter(t => t.type === 'equity_call').map(t => {
+      const obj = D.objecten.find(o => o.id === t.object_id);
+      const m = maandIndex(t.verwachte_datum);
+      return { label: (obj?.naam || 'Equity call'), bars: [{ m: Math.max(0, m), d: 1, ...types[4] }] };
+    }),
+    ...D.objecten.filter(o => o.status === 'acquisitie').map(o => {
+      const tx = D.transacties.find(t => t.object_id === o.id && t.type === 'equity_call');
+      const m = tx ? maandIndex(tx.verwachte_datum) : 4;
+      return { label: o.naam, bars: [{ m: Math.max(0, m - 2), d: 2, ...types[5] }, { m: Math.max(0, m), d: 24 - m, ...types[2] }] };
+    }),
+  ];
+
+  let html = `<div style="min-width:${LW + MONTHS * CW}px">`;
+  html += `<div style="display:flex;margin-left:${LW}px;margin-bottom:4px">`;
+  MND.forEach((m, i) => html += `<div style="width:${CW}px;flex-shrink:0;text-align:center;font-size:9px;color:var(--text-3);border-left:1px solid var(--border);padding:1px 0${i % 3 === 0 ? ';font-weight:600;color:var(--text-2)' : ''}">${m}</div>`);
+  html += '</div>';
+
+  ganttRows.forEach(row => {
+    html += `<div style="display:flex;align-items:center;margin-bottom:3px;min-height:26px">`;
+    html += `<div style="width:${LW}px;flex-shrink:0;font-size:10.5px;font-weight:600;color:var(--text-2);padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${row.label}</div>`;
+    html += `<div style="flex:1;position:relative;height:26px;border-left:1px solid var(--border)">`;
+    row.bars.forEach(b => {
+      const left = Math.max(0, b.m) * CW;
+      const w = Math.max(b.d * CW - 1, 4);
+      if (b.m < MONTHS) html += `<div class="g-bar" style="left:${left}px;width:${Math.min(w, (MONTHS - b.m) * CW)}px;background:${b.color};color:${b.tc}">${b.d > 2 ? b.label : ''}</div>`;
+    });
+    html += `<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:#c0392b;z-index:5;pointer-events:none"></div>`;
+    html += `</div></div>`;
+  });
+  html += '</div>';
+  document.getElementById('gantt-container').innerHTML = html;
+
+  // Cash overlay chart
+  const cf = E.cashflowForecast(24, 'base');
+  const inflows = cf.map(m => Math.max(0, m.huur + Math.max(0, m.incidenteel)));
+  const outflows = cf.map(m => -(m.kosten + m.schulddienst + Math.abs(Math.min(0, m.incidenteel))));
+  const kas = cf.map(m => m.sluitend_kas);
+  new Chart(document.getElementById('cashOverlayChart'), {
+    type: 'bar',
+    data: { labels: MND, datasets: [
+      { label: 'Inflows', data: inflows, backgroundColor: 'rgba(45,122,79,0.65)', borderRadius: 2 },
+      { label: 'Outflows', data: outflows, backgroundColor: 'rgba(192,57,43,0.65)', borderRadius: 2 },
+      { type: 'line', label: 'Kasverloop', data: kas, borderColor: '#1a5fa8', borderWidth: 2.5, fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+      { type: 'line', label: 'Min. drempel', data: new Array(24).fill(D.meta.minimum_kas_drempel), borderColor: '#c0392b', borderWidth: 1, borderDash: [3, 3], fill: false, pointRadius: 0, yAxisID: 'y' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 9 }, color: '#8a8a82', maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: { font: { size: 9 }, color: '#8a8a82', callback: v => E.fmt(v) }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+  });
+
+  document.getElementById('tl-kpis').innerHTML = [
+    kpi('Events komende 12m', D.transacties.length.toString(), 'Over alle projecten', 'kv-blue'),
+    kpi('Kritieke events', D.transacties.filter(t => t.kans_pct < 80 || t.bedrag < -500000).length.toString(), 'Vereisen actie', 'kv-red'),
+    kpi('Grootste outflow', E.fmt(Math.min(...D.transacties.map(t => t.bedrag))), 'Geplande transactie', 'kv-red'),
+    kpi('Beste inflow', E.fmt(Math.max(...D.transacties.map(t => t.bedrag))), 'Geplande transactie', 'kv-green'),
+  ].join('');
+
+  document.getElementById('dep-blocks').innerHTML = D.transacties
+    .filter(t => t.afhankelijk_van)
+    .map(t => {
+      const dep = D.transacties.find(d => d.id === t.afhankelijk_van);
+      return `<div class="dep-block dep-amber"><strong>${t.naam}</strong> is afhankelijk van <strong>${dep?.naam || t.afhankelijk_van}</strong>.<br><span style="color:var(--text-2)">${t.toelichting}</span></div>`;
+    }).join('') || '<div class="dep-block dep-green">Geen kritieke afhankelijkheden gedetecteerd.</div>';
+}
+
+// ---- SCENARIO ----
+const scenParams = { ...D.scenario_params.base };
+function buildScenario() {
+  const sliders = [
+    { id: 'p-huur', label: 'Huurgroei % p.j.', min: -5, max: 8, step: 0.5, key: 'huurgroei_pct', fmt: v => v.toFixed(1) + '%' },
+    { id: 'p-leeg', label: 'Leegstand %', min: 0, max: 25, step: 1, key: 'leegstand_pct', fmt: v => v.toFixed(0) + '%' },
+    { id: 'p-yield', label: 'Yield vastgoed %', min: 4, max: 9, step: 0.25, key: 'yield_vastgoed_pct', fmt: v => v.toFixed(2) + '%' },
+    { id: 'p-kosten', label: 'Kostenstijging %', min: 0, max: 12, step: 0.5, key: 'kostenstijging_pct', fmt: v => v.toFixed(1) + '%' },
+    { id: 'p-rente', label: 'Marktrente %', min: 1, max: 8, step: 0.25, key: 'rente_variabel_pct', fmt: v => v.toFixed(2) + '%' },
+    { id: 'p-bouw', label: 'Bouwkosten stijging %', min: 0, max: 15, step: 0.5, key: 'bouwkosten_stijging', fmt: v => v.toFixed(1) + '%' },
+  ];
+
+  const half = Math.ceil(sliders.length / 2);
+  const left = sliders.slice(0, half);
+  const right = sliders.slice(half);
+  const renderSliders = arr => arr.map(s => `
+    <div class="slider-row">
+      <span class="slider-label">${s.label}</span>
+      <input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${scenParams[s.key]}" id="${s.id}" oninput="updateScen('${s.key}','${s.id}',this.value,'${s.id}-o',x=>${s.fmt.toString().replace(/v=>/,'')})">
+      <span class="slider-val" id="${s.id}-o">${s.fmt(scenParams[s.key])}</span>
+    </div>`).join('');
+  document.getElementById('scen-sliders').innerHTML = `<div>${renderSliders(left)}</div><div>${renderSliders(right)}</div>`;
+  updateScenKpis();
+  buildSensTable();
+}
+
+function updateScen(key, id, val, outId) {
+  scenParams[key] = parseFloat(val);
+  const el = document.getElementById(outId);
+  if (el) {
+    const fmt = { huurgroei_pct: v => v.toFixed(1) + '%', leegstand_pct: v => v.toFixed(0) + '%', yield_vastgoed_pct: v => v.toFixed(2) + '%', kostenstijging_pct: v => v.toFixed(1) + '%', rente_variabel_pct: v => v.toFixed(2) + '%', bouwkosten_stijging: v => v.toFixed(1) + '%' };
+    el.textContent = (fmt[key] || (v => v))(parseFloat(val));
+  }
+  updateScenKpis();
+}
+
+function updateScenKpis() {
+  const noi = E.totalNOI() * (1 - scenParams.leegstand_pct / 100) * (1 + scenParams.huurgroei_pct / 100);
+  const rv = noi / (scenParams.yield_vastgoed_pct / 100);
+  const eq = rv - E.totaleSculd() + E.totaleKas();
+  const extraRente = E.totaleSculd() * ((scenParams.rente_variabel_pct - D.scenario_params.base.rente_variabel_pct) / 100);
+  const cf = E.cashflowForecast(24, 'base');
+  const minKas = Math.min(...cf.map(m => m.sluitend_kas)) - extraRente;
+
+  document.getElementById('scen-kpis').innerHTML = [
+    kpi('Vastgoedwaarde', E.fmt(rv), E.fmt(noi, 0) + ' ÷ ' + scenParams.yield_vastgoed_pct.toFixed(2) + '%', 'kv-blue'),
+    kpi('Equity value', E.fmt(eq), 'Vastgoed − schuld + cash', eq > E.equityValue() * 0.9 ? 'kv-green' : eq > 0 ? 'kv-amber' : 'kv-red'),
+    kpi('Min. kasaldo', E.fmt(minKas), 'Aangepast voor rente', minKas > D.meta.minimum_kas_drempel ? 'kv-green' : minKas > 0 ? 'kv-amber' : 'kv-red'),
+    kpi('Extra rentekost/jr', E.fmt(Math.max(0, extraRente)), 'Door rentestijging', extraRente > 0 ? 'kv-red' : 'kv-green'),
+  ].join('');
+
+  const scenarios = [
+    { naam: 'Base', rv: E.vastgoedwaardeYield(), eq: E.equityValue(), kas: Math.min(...E.cashflowForecast(24, 'base').map(m => m.sluitend_kas)), badge: 'green' },
+    { naam: 'Upside', rv: E.vastgoedwaardeYield(D.scenario_params.upside.yield_vastgoed_pct), eq: E.equityValue(D.scenario_params.upside.yield_vastgoed_pct), kas: Math.min(...E.cashflowForecast(24, 'upside').map(m => m.sluitend_kas)), badge: 'green' },
+    { naam: 'Downside', rv: E.vastgoedwaardeYield(D.scenario_params.downside.yield_vastgoed_pct), eq: E.equityValue(D.scenario_params.downside.yield_vastgoed_pct), kas: Math.min(...E.cashflowForecast(24, 'downside').map(m => m.sluitend_kas)), badge: 'red' },
+    { naam: 'Aangepast', rv, eq, kas: minKas, badge: eq > 0 ? 'blue' : 'red' },
+    { naam: 'Worst case', rv: E.totalNOI() * 0.75 / 0.08, eq: E.totalNOI() * 0.75 / 0.08 - E.totaleSculd() * 1.05 + E.totaleKas() * 0.8, kas: -800000, badge: 'red' },
+  ];
+
+  document.getElementById('scen-tbl').innerHTML = `
+    <thead><tr><th>Scenario</th><th>Vastgoedwaarde</th><th>Equity value</th><th>Min. kasaldo</th><th>Funding gap</th><th>Uitkomst</th></tr></thead>
+    <tbody>${scenarios.map(s => `<tr>
+      <td style="font-weight:600">${s.naam}</td>
+      <td class="num">${E.fmt(s.rv)}</td>
+      <td class="num">${E.fmt(s.eq)}</td>
+      <td class="num ${s.kas < 0 ? 'red' : s.kas < D.meta.minimum_kas_drempel ? 'amber' : 'green'}">${E.fmt(s.kas)}</td>
+      <td class="num red">${s.kas < 0 ? E.fmt(s.kas) : '—'}</td>
+      <td>${badge(s.eq > 0 ? (s.kas >= D.meta.minimum_kas_drempel ? 'Gezond' : 'Aandacht') : 'Kritiek', s.badge)}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+function buildSensTable() {
+  const yields = [4, 4.5, 5, 5.4, 6, 6.5, 7, 7.5, 8];
+  const nois = [0.7, 0.85, 1.0, 1.24, 1.5, 1.8].map(v => v * 1e6);
+  let h = '<thead><tr><th>NOI \\ Yield</th>';
+  yields.forEach(y => h += `<th>${y}%</th>`);
+  h += '</tr></thead><tbody>';
+  nois.forEach(n => {
+    h += `<tr><td style="font-weight:600">${E.fmt(n, 1)}</td>`;
+    yields.forEach(y => {
+      const eq = (n / (y / 100)) - E.totaleSculd() + E.totaleKas();
+      const isBase = Math.abs(y - D.scenario_params.base.yield_vastgoed_pct) < 0.01 && Math.abs(n - E.totalNOI()) < 10000;
+      const cls = isBase ? 'cell-base' : eq > E.equityValue() * 1.1 ? 'cell-high' : eq > E.equityValue() * 0.8 ? 'cell-mid' : 'cell-low';
+      h += `<td class="${cls}">${(eq / 1e6).toFixed(1)}</td>`;
+    });
+    h += '</tr>';
+  });
+  document.getElementById('sens-tbl').innerHTML = h + '</tbody>';
+}
+
+// ---- FINANCIERING ----
+function buildFinanciering() {
+  const leningen = D.leningen;
+  const totSch = E.totaleSculd();
+  const gew = E.gewogenRente();
+  const nu = new Date();
+  const eerstvolgend = leningen.filter(l => l.einddatum).sort((a, b) => new Date(a.einddatum) - new Date(b.einddatum))[0];
+
+  document.getElementById('fin-sub').textContent = `${leningen.length} faciliteiten · ${E.fmt(totSch)} totaal · Gew. rente ${gew.toFixed(1)}%`;
+  document.getElementById('fin-kpis').innerHTML = [
+    kpi('Totale schuld', E.fmt(totSch), leningen.length + ' leningen', 'kv-red'),
+    kpi('Gew. gem. rente', gew.toFixed(2) + '%', 'Gewogen op saldo'),
+    kpi('Eerstvolgende afloop', eerstvolgend?.einddatum || '—', eerstvolgend?.naam, 'kv-amber'),
+    kpi('LTV portefeuille', E.gewogenLTV().toFixed(0) + '%', 'Gewogen gem.'),
+  ].join('');
+
+  const rows = leningen.map(l => {
+    const obj = D.objecten.find(o => o.id === l.object_id);
+    const maanden = l.einddatum ? (new Date(l.einddatum) - nu) / (1000 * 60 * 60 * 24 * 30) : 999;
+    const statusCls = maanden < 3 ? 'red' : maanden < 9 ? 'amber' : 'green';
+    const statusTxt = maanden < 3 ? 'Kritiek' : maanden < 9 ? 'Actie vereist' : 'Actief';
+    const ltv = l.object_id ? E.ltvPerObject().find(o => o.id === l.object_id)?.ltv : null;
+    const dscr = l.covenant_dscr_min ? (E.totalNOI() / (E.maandelijkseSchulddienst() * 12)).toFixed(2) : '—';
+    return `<tr>
+      <td style="font-weight:600">${l.naam}</td>
+      <td>${obj?.naam || 'Groepsniveau'}</td>
+      <td>${l.type}</td>
+      <td class="num">${E.fmt(l.huidig_saldo)}</td>
+      <td class="num">${l.rente_pct}%</td>
+      <td>${l.aflossing_type}</td>
+      <td class="${maanden < 9 ? (maanden < 3 ? 'red' : 'amber') : ''}" style="font-weight:${maanden < 9 ? 600 : 400}">${l.einddatum || '—'}</td>
+      <td class="num ${ltv && ltv > (l.covenant_ltv_max || 100) * 0.9 ? 'amber' : ''}">${ltv ? ltv.toFixed(0) + '%' : '—'}</td>
+      <td class="num">${dscr}</td>
+      <td>${badge(statusTxt, statusCls)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('fin-tbl').innerHTML = `
+    <thead><tr><th>Lening</th><th>Object</th><th>Type</th><th>Saldo</th><th>Rente</th><th>Aflossing</th><th>Einddatum</th><th>LTV</th><th>DSCR</th><th>Status</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+
+  // Maturity
+  const jaren = {};
+  leningen.forEach(l => {
+    if (l.einddatum) {
+      const jr = l.einddatum.substring(0, 4);
+      jaren[jr] = (jaren[jr] || 0) + l.huidig_saldo;
+    }
+  });
+  const jaarLabels = Object.keys(jaren).sort();
+  new Chart(document.getElementById('matChart'), {
+    type: 'bar',
+    data: { labels: jaarLabels, datasets: [{ data: jaarLabels.map(j => Math.round(jaren[j] / 1e6 * 10) / 10), backgroundColor: jaarLabels.map(j => parseInt(j) <= new Date().getFullYear() + 1 ? '#F09595' : parseInt(j) <= new Date().getFullYear() + 2 ? '#FAC775' : '#B5D4F4'), borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y + 'M' } } }, scales: { x: { ticks: { font: { size: 11 }, color: '#8a8a82' }, grid: { display: false } }, y: { ticks: { font: { size: 11 }, color: '#8a8a82', callback: v => '€' + v + 'M' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+  });
+
+  // Tranches
+  document.getElementById('tranche-tbl').innerHTML = `
+    <thead><tr><th>Nr</th><th>Lening</th><th>Bedrag</th><th>Datum</th><th>Voorwaarde</th><th>Status</th></tr></thead>
+    <tbody>${D.bouw_tranches.map(t => {
+    const ln = D.leningen.find(l => l.id === t.lening_id);
+    const sc = { getrokken: 'green', goedgekeurd: 'blue', gepland: 'amber', toekomstig: 'gray' };
+    return `<tr><td>${t.nr}</td><td>${ln?.naam}</td><td class="num">${E.fmt(t.bedrag)}</td><td>${t.datum}</td><td>${t.voorwaarde}</td><td>${badge(t.status, sc[t.status] || 'gray')}</td></tr>`;
+  }).join('')}</tbody>`;
+}
+
+// ---- COVENANT ----
+function buildCovenant() {
+  const ltvObjs = E.ltvPerObject();
+  const dscr = E.dscr();
+  const icr = E.icr();
+  const breaches = ltvObjs.filter(o => {
+    const ln = D.leningen.find(l => l.object_id === o.id);
+    return ln?.covenant_ltv_max && o.ltv > ln.covenant_ltv_max;
+  }).length;
+  const nearBreach = ltvObjs.filter(o => {
+    const ln = D.leningen.find(l => l.object_id === o.id);
+    return ln?.covenant_ltv_max && o.ltv > ln.covenant_ltv_max * 0.92 && o.ltv <= ln.covenant_ltv_max;
+  }).length;
+
+  document.getElementById('cov-kpis').innerHTML = [
+    kpi('Covenants actief', D.leningen.filter(l => l.covenant_ltv_max || l.covenant_dscr_min).length.toString()),
+    kpi('Breaches huidig', breaches.toString(), 'Over alle leningen', breaches > 0 ? 'kv-red' : 'kv-green'),
+    kpi('Near-breach (<10%)', nearBreach.toString(), 'Marge smal', nearBreach > 0 ? 'kv-amber' : 'kv-green'),
+    kpi('DSCR huidig', dscr.toFixed(2), 'Min. 1,20 vereist', dscr >= 1.4 ? 'kv-green' : dscr >= 1.2 ? 'kv-amber' : 'kv-red'),
+  ].join('');
+
+  const bars = [...ltvObjs.filter(o => o.ltv !== null).map(o => {
+    const ln = D.leningen.find(l => l.object_id === o.id);
+    const max = ln?.covenant_ltv_max || 75;
+    const pct = E.clamp(o.ltv / max * 100, 0, 100);
+    const color = o.ltv > max ? '#E24B4A' : o.ltv > max * 0.9 ? '#EF9F27' : '#639922';
+    return { label: o.naam + ' LTV', val: pct, display: o.ltv.toFixed(0) + '% / max ' + max + '%', threshPct: 100, color };
+  }),
+  { label: 'Portefeuille DSCR', val: E.clamp((dscr / 2) * 100, 0, 100), display: dscr.toFixed(2) + ' / min 1,20', threshPct: 60, color: dscr >= 1.4 ? '#639922' : dscr >= 1.2 ? '#EF9F27' : '#E24B4A' },
+  { label: 'ICR portefeuille', val: E.clamp((icr / 4) * 100, 0, 100), display: icr.toFixed(2) + ' / min 1,40', threshPct: 35, color: icr >= 2 ? '#639922' : '#EF9F27' },
+  ];
+
+  document.getElementById('cov-bars').innerHTML = bars.map(b => `
+    <div class="cov-row">
+      <span class="cov-label">${b.label}</span>
+      <div class="cov-track">
+        <div class="cov-fill" style="width:${b.val}%;background:${b.color}"></div>
+        <div class="cov-thresh" style="left:${b.threshPct}%"></div>
+      </div>
+      <span class="cov-val" style="color:${b.color}">${b.display}</span>
+    </div>`).join('');
+
+  document.getElementById('cov-sim-tbl').innerHTML = `
+    <thead><tr><th>Covenant</th><th>Huidig</th><th>Limiet</th><th>Base</th><th>Downside</th><th>Worst case</th></tr></thead>
+    <tbody>${ltvObjs.filter(o => o.ltv).map(o => {
+    const ln = D.leningen.find(l => l.object_id === o.id);
+    const max = ln?.covenant_ltv_max || 75;
+    const base = o.ltv * 0.98;
+    const dn = o.ltv * 1.14;
+    const wc = o.ltv * 1.28;
+    return `<tr>
+      <td>${o.naam} LTV</td>
+      <td class="num ${o.ltv > max ? 'red' : o.ltv > max * 0.92 ? 'amber' : ''}">${o.ltv.toFixed(0)}%</td>
+      <td class="num">${max}%</td>
+      <td class="num">${base.toFixed(0)}%</td>
+      <td class="num ${dn > max ? 'red' : 'amber'}">${dn.toFixed(0)}%${dn > max ? ' ⚠' : ''}</td>
+      <td class="num red">${wc.toFixed(0)}%${wc > max ? ' ✗' : ''}</td>
+    </tr>`;
+  }).join('')}</tbody>`;
+}
+
+// ---- WAARDERING ----
+const valParams = {
+  noi: E.totalNOI(),
+  ebitda: E.totalNOI() * 0.79,
+  debt: E.totaleSculd(),
+  cash: E.totaleKas(),
+  mult: D.waardering.ebitda_multiple,
+  yield_pct: D.scenario_params.base.yield_vastgoed_pct,
+  prem_pct: D.waardering.platform_premium_pct,
+};
+let impC = null;
+function buildValuation() {
+  const sliders = [
+    { id: 'v-noi', label: 'NOI (€/jaar)', min: E.totalNOI() * 0.5, max: E.totalNOI() * 1.8, step: 10000, key: 'noi', fmt: v => E.fmt(v, 1) },
+    { id: 'v-ebitda', label: 'Adj. EBITDA', min: E.totalNOI() * 0.4, max: E.totalNOI() * 1.5, step: 10000, key: 'ebitda', fmt: v => E.fmt(v, 0) },
+    { id: 'v-debt', label: 'Totale schuld', min: E.totaleSculd() * 0.5, max: E.totaleSculd() * 1.5, step: 50000, key: 'debt', fmt: v => E.fmt(v, 1) },
+    { id: 'v-cash', label: 'Cash', min: 0, max: E.totaleKas() * 3, step: 50000, key: 'cash', fmt: v => E.fmt(v, 2) },
+    { id: 'v-mult', label: 'EBITDA multiple', min: 5, max: 14, step: 0.5, key: 'mult', fmt: v => v.toFixed(1) + '×' },
+    { id: 'v-yield', label: 'Yield %', min: 4, max: 8, step: 0.25, key: 'yield_pct', fmt: v => v.toFixed(2) + '%' },
+    { id: 'v-prem', label: 'Platform premium %', min: 0, max: 20, step: 1, key: 'prem_pct', fmt: v => v.toFixed(0) + '%' },
+  ];
+  const half = 4;
+  const renderS = arr => arr.map(s => `<div class="slider-row"><span class="slider-label">${s.label}</span><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${valParams[s.key]}" id="${s.id}" oninput="valParams['${s.key}']=parseFloat(this.value);document.getElementById('${s.id}-o').textContent=this.value;recalcVal()"><span class="slider-val" id="${s.id}-o">${s.fmt(valParams[s.key])}</span></div>`).join('');
+  document.getElementById('val-sliders').innerHTML = `<div>${renderS(sliders.slice(0, half))}</div><div>${renderS(sliders.slice(half))}</div>`;
+  recalcVal();
+}
+
+function recalcVal() {
+  const { noi, ebitda, debt, cash, mult, yield_pct, prem_pct } = valParams;
+  const rv = noi / (yield_pct / 100);
+  const ev = ebitda * mult;
+  const eq = rv - debt + cash;
+  const tv = eq * (1 + prem_pct / 100);
+  const prem = eq * prem_pct / 100;
+
+  document.getElementById('val-kpis').innerHTML = [
+    kpi('Vastgoedwaarde', E.fmt(rv), E.fmt(noi, 1) + ' ÷ ' + yield_pct.toFixed(2) + '%', 'kv-blue'),
+    kpi('Enterprise value', E.fmt(ev), E.fmt(ebitda, 0) + ' × ' + mult.toFixed(1) + '×', 'kv-blue'),
+    kpi('Equity value', E.fmt(eq), 'Vastgoed − schuld + cash', eq > 0 ? 'kv-green' : 'kv-red'),
+    kpi('Totale waarde', E.fmt(tv), 'Equity + ' + prem_pct.toFixed(0) + '% premium', 'kv-green'),
+  ].join('');
+
+  const uRv = noi * 1.08 / ((yield_pct / 100) * 0.93);
+  const uEq = uRv - debt + cash;
+  const dRv = noi * 0.87 / ((yield_pct / 100) * 1.24);
+  const dEq = dRv - debt + cash;
+  document.getElementById('val-scenarios').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div style="background:var(--green-bg);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--green-text);margin-bottom:3px">Upside</div><div style="font-size:15px;font-weight:700;color:var(--green-text)">${E.fmt(uRv)}</div><div style="font-size:10px;color:var(--green-text)">Equity: ${E.fmt(uEq)}</div></div>
+      <div style="background:var(--blue-bg);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--blue-text);margin-bottom:3px">Base</div><div style="font-size:15px;font-weight:700;color:var(--blue-text)">${E.fmt(rv)}</div><div style="font-size:10px;color:var(--blue-text)">Equity: ${E.fmt(eq)}</div></div>
+      <div style="background:var(--red-bg);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--red-text);margin-bottom:3px">Downside</div><div style="font-size:15px;font-weight:700;color:var(--red-text)">${E.fmt(dRv)}</div><div style="font-size:10px;color:var(--red-text)">Equity: ${E.fmt(dEq)}</div></div>
+    </div>`;
+
+  const max = tv * 1.05;
+  const steps = [
+    { l: 'Vastgoedwaarde', v: rv, c: '#B5D4F4', tc: '#0C447C', tot: true },
+    { l: 'Min. schuld', v: -debt, c: '#F09595', tc: '#791F1F', tot: false },
+    { l: 'Plus cash', v: cash, c: '#97C459', tc: '#27500A', tot: false },
+    { l: 'Equity value', v: eq, c: '#378ADD', tc: '#042C53', tot: true },
+    { l: 'Platform prem.', v: prem, c: '#EF9F27', tc: '#412402', tot: false },
+    { l: 'Totale waarde', v: tv, c: '#534AB7', tc: '#26215C', tot: true },
+  ];
+  document.getElementById('val-bridge').innerHTML = steps.map(s => {
+    const bw = Math.max(4, Math.abs(s.tot ? s.v : s.v) / max * 100);
+    const disp = s.tot ? E.fmt(s.v) : (s.v < 0 ? '−' : '+') + E.fmt(Math.abs(s.v));
+    return `<div class="bridge-row"><span class="bridge-label">${s.l}</span><div class="bridge-bar" style="width:${bw}%;background:${s.c}"><span class="bridge-bar-val" style="color:${s.tc}">${disp}</span></div></div>`;
+  }).join('');
+
+  const yields = [4, 4.5, 5, 5.4, 6, 6.5, 7, 7.5, 8];
+  const nois = [0.7, 0.85, 1.0, noi / 1e6, 1.5, 1.8].map(v => v * 1e6);
+  let h = '<thead><tr><th>NOI\\Y</th>';
+  yields.forEach(y => h += `<th>${y}%</th>`);
+  h += '</tr></thead><tbody>';
+  nois.forEach(n => {
+    h += `<tr><td style="font-weight:600">${E.fmt(n, 1)}</td>`;
+    yields.forEach(y => {
+      const eq2 = (n / (y / 100)) - debt + cash;
+      const isBase = Math.abs(y - yield_pct) < 0.01 && Math.abs(n - noi) < 10000;
+      const cls = isBase ? 'cell-base' : eq2 > eq * 1.2 ? 'cell-high' : eq2 > eq * 0.8 ? 'cell-mid' : 'cell-low';
+      h += `<td class="${cls}">${(eq2 / 1e6).toFixed(1)}</td>`;
+    });
+    h += '</tr>';
+  });
+  document.getElementById('val-sens').innerHTML = h + '</tbody>';
+
+  const impacts = [
+    { l: 'Base', v: eq, c: '#1a5fa8' },
+    { l: 'Huur −15%', v: (noi * 0.85 / (yield_pct / 100)) - debt + cash, c: '#c0392b' },
+    { l: 'Yield +1,5%', v: (noi / ((yield_pct + 1.5) / 100)) - debt + cash, c: '#c0392b' },
+    { l: 'Rente +150bps', v: eq - debt * 0.015 / 0.07, c: '#f09595' },
+    { l: 'Bouw +6m delay', v: eq - noi * 0.4, c: '#fac775' },
+    { l: 'All-in worst', v: (noi * 0.8 / ((yield_pct + 2) / 100)) - debt * 1.05 + cash * 0.9, c: '#7a1f1a' },
+  ];
+  if (impC) impC.destroy();
+  impC = new Chart(document.getElementById('impactChart'), {
+    type: 'bar',
+    data: { labels: impacts.map(s => s.l), datasets: [{ data: impacts.map(s => Math.round(s.v / 1e6 * 100) / 100), backgroundColor: impacts.map(s => s.c), borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + Math.abs(ctx.parsed.x).toFixed(2) + 'M equity' } } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => '€' + v + 'M' }, grid: { color: 'rgba(0,0,0,0.05)' } }, y: { ticks: { font: { size: 11 }, color: '#8a8a82' }, grid: { display: false } } } },
+  });
+}
+
+// ---- OWNERSHIP ----
+function buildOwnership() {
+  const SVG = document.getElementById('org-svg');
+  const BW = 100, BH = 38;
+  const nodes = [
+    ...D.eigenaren.map((e, i) => ({ id: e.id, x: i === 0 ? 20 : 270, y: 20, label: e.naam, sub: 'UBO · ' + e.participatie_pct + '%', fill: '#EEEDFE', stroke: '#AFA9EC', tc1: '#3C3489', tc2: '#534AB7' })),
+    ...D.eigenaren.map((e, i) => ({ id: e.id + '_h', x: i === 0 ? 20 : 270, y: 110, label: e.holding, sub: '100% ' + e.naam.split(' ')[0], fill: '#E1F5EE', stroke: '#5DCAA5', tc1: '#085041', tc2: '#0F6E56' })),
+    { id: 'fv', x: 150, y: 200, label: D.meta.bedrijfsnaam.split(' ').slice(0, 2).join(' '), sub: D.eigenaren.map(e => e.participatie_pct + '% ' + e.naam.split(' ')[0]).join(' · '), fill: '#FAECE7', stroke: '#D85A30', tc1: '#4A1B0C', tc2: '#712B13', wide: true },
+    ...D.objecten.filter(o => o.eigenaar_bv).reduce((acc, o) => {
+      const bv = o.eigenaar_bv;
+      if (!acc.find(n => n.label === bv)) acc.push({ id: 'bv_' + acc.length, x: 20 + acc.length * 120, y: 295, label: bv.split(' ')[0], sub: bv, fill: '#E6F1FB', stroke: '#378ADD', tc1: '#042C53', tc2: '#185FA5' });
+      return acc;
+    }, []),
+  ];
+
+  let svg = nodes.map(n => {
+    const w = n.wide ? 160 : BW;
+    const cx = n.x + w / 2;
+    return `<g class="ent-box" onclick="showEnt('${n.id}')">
+      <rect x="${n.x}" y="${n.y}" width="${w}" height="${BH}" rx="7" fill="${n.fill}" stroke="${n.stroke}" stroke-width="0.7"/>
+      <text x="${cx}" y="${n.y + 14}" text-anchor="middle" font-size="11" font-weight="600" fill="${n.tc1}" font-family="DM Sans,sans-serif">${n.label}</text>
+      <text x="${cx}" y="${n.y + 27}" text-anchor="middle" font-size="9.5" fill="${n.tc2}" font-family="DM Sans,sans-serif">${n.sub}</text>
+    </g>`;
+  }).join('');
+
+  // Arrows
+  D.eigenaren.forEach((e, i) => {
+    const from = nodes.find(n => n.id === e.id);
+    const to = nodes.find(n => n.id === e.id + '_h');
+    if (from && to) svg += `<line x1="${from.x + BW / 2}" y1="${from.y + BH}" x2="${to.x + BW / 2}" y2="${to.y}" stroke="#888780" stroke-width="1.2" marker-end="url(#arr)"/>`;
+  });
+  D.eigenaren.forEach(e => {
+    const from = nodes.find(n => n.id === e.id + '_h');
+    const fv = nodes.find(n => n.id === 'fv');
+    if (from && fv) {
+      svg += `<line x1="${from.x + BW / 2}" y1="${from.y + BH}" x2="${fv.x + 80}" y2="${fv.y}" stroke="#888780" stroke-width="1.2" marker-end="url(#arr)"/>`;
+      svg += `<text x="${(from.x + BW / 2 + fv.x + 80) / 2}" y="${(from.y + BH + fv.y) / 2}" text-anchor="middle" font-size="9" fill="#5a5a54" font-family="DM Sans,sans-serif">${e.participatie_pct}%</text>`;
+    }
+  });
+
+  SVG.innerHTML = SVG.innerHTML + svg;
+
+  // Look-through table
+  const lt = E.navPerEigenaar();
+  document.getElementById('lt-tbl').innerHTML = `
+    <thead><tr><th>Eigenaar</th><th>Participatie</th><th>Kapitaal ingebracht</th><th>NAV-aandeel</th><th>Equity-aandeel</th><th>IRR (schatting)</th></tr></thead>
+    <tbody>${lt.map(e => `<tr>
+      <td style="font-weight:600">${e.naam}</td>
+      <td class="num">${e.participatie_pct}%</td>
+      <td class="num">${E.fmt(e.kapitaal_ingebracht)}</td>
+      <td class="num green">${E.fmt(e.nav_aandeel)}</td>
+      <td class="num green">${E.fmt(e.equity_aandeel)}</td>
+      <td class="num green">~${(10 + e.participatie_pct * 0.02).toFixed(1)}%</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+const entData = {};
+D.eigenaren.forEach(e => {
+  entData[e.id] = { naam: e.naam, Type: 'UBO / natuurlijk persoon', Participatie: e.participatie_pct + '%', 'Kapitaal ingebracht': E.fmt(e.kapitaal_ingebracht), 'NAV-aandeel': E.fmt(E.nav() * e.participatie_pct / 100), 'ASL gegeven': E.fmt(e.asl_gegeven) };
+  entData[e.id + '_h'] = { naam: e.holding, Type: 'Persoonlijke holding', Eigenaar: '100% ' + e.naam, 'Cash beschikbaar': E.fmt(D.kasstand.find(k => k.entiteit === e.holding)?.saldo || 0) };
+});
+entData['fv'] = { naam: D.meta.bedrijfsnaam, Type: 'Hoofdentiteit', 'Totale schuld': E.fmt(E.totaleSculd()), NAV: E.fmt(E.nav()), Eigenaren: D.eigenaren.map(e => e.participatie_pct + '% ' + e.naam).join(', ') };
+
+function showEnt(id) {
+  const d = entData[id];
+  if (!d) return;
+  document.getElementById('ent-naam').textContent = d.naam;
+  document.getElementById('ent-rows').innerHTML = Object.entries(d).filter(([k]) => k !== 'naam').map(([k, v]) => `<div class="ed-row"><span class="ed-key">${k}</span><span class="ed-val">${v}</span></div>`).join('');
+  document.getElementById('ent-detail').style.display = 'block';
+}
+
+// ---- EQUITY CALLS ----
+function buildEquity() {
+  const totaal = D.transacties.filter(t => t.type === 'equity_call').reduce((s, t) => s + Math.abs(t.bedrag), 0);
+  const gewogen = E.gewogenEquityCall();
+  const holdingKas = D.eigenaren.reduce((s, e) => s + (D.kasstand.find(k => k.entiteit === e.holding)?.saldo || 0), 0);
+
+  document.getElementById('eq-sub').textContent = `${D.eigenaren.map(e => e.naam).join(' · ')} · ${D.transacties.filter(t => t.type === 'equity_call').length} calls gepland`;
+  document.getElementById('eq-kpis').innerHTML = [
+    kpi('Totale equity calls', E.fmt(totaal), D.transacties.filter(t => t.type === 'equity_call').length + ' events', 'kv-red'),
+    kpi('Probability-gewogen', E.fmt(gewogen), 'Op basis van kansweging', 'kv-amber'),
+    kpi('Holdings cash beschikbaar', E.fmt(holdingKas), D.eigenaren.length + ' holdings samen', 'kv-blue'),
+  ].join('');
+
+  const rows = D.transacties.filter(t => t.type === 'equity_call').map(t => {
+    const obj = D.objecten.find(o => o.id === t.object_id);
+    const splits = D.eigenaren.map(e => `${e.naam.split(' ')[0]}: ${E.fmt(Math.abs(t.bedrag) * e.participatie_pct / 100)}`).join('<br>');
+    return `<tr>
+      <td style="font-weight:600">${obj?.naam || t.naam}</td>
+      <td class="num red">${E.fmt(t.bedrag)}</td>
+      <td>${t.verwachte_datum.substring(0, 7)}</td>
+      <td style="font-size:11px">${splits}</td>
+      <td>${t.toelichting || '—'}</td>
+      <td class="num">${t.kans_pct}%</td>
+      <td>${certBadge(t.zekerheid)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('eq-tbl').innerHTML = `
+    <thead><tr><th>Project</th><th>Totaal</th><th>Datum</th><th>Verdeling</th><th>Bron</th><th>Kans</th><th>Status</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+
+  document.getElementById('eq-eigenaren').innerHTML = D.eigenaren.map(e => {
+    const hKas = D.kasstand.find(k => k.entiteit === e.holding)?.saldo || 0;
+    const calls = D.transacties.filter(t => t.type === 'equity_call').reduce((s, t) => s + Math.abs(t.bedrag) * e.participatie_pct / 100, 0);
+    const gap = calls - hKas;
+    const maxV = Math.max(hKas, calls);
+    return `<div class="card" style="margin-bottom:0">
+      <div class="card-title">${e.naam} — ${e.holding}</div>
+      <div class="prog-wrap"><span class="prog-label">Holding cash beschikbaar</span><div class="prog-track"><div class="prog-fill" style="width:${E.clamp(hKas / maxV * 100, 0, 100)}%;background:var(--blue)"></div></div><span class="prog-val">${E.fmt(hKas)}</span></div>
+      <div class="prog-wrap"><span class="prog-label">Totale equity calls (aandeel)</span><div class="prog-track"><div class="prog-fill" style="width:${E.clamp(calls / maxV * 100, 0, 100)}%;background:var(--red)"></div></div><span class="prog-val">${E.fmt(calls)}</span></div>
+      ${gap > 0 ? alertEl('aandacht', `Tekort: ${E.fmt(gap)} extra financiering of dividend nodig.`) : alertEl('ok', 'Voldoende cash beschikbaar.')}
+    </div>`;
+  }).join('');
+}
+
+// ---- EXIT & RISK ----
+function buildExit() {
+  document.getElementById('exit-kpis').innerHTML = [
+    kpi('Exitwaarde base', E.fmt(E.totaleWaarde()), 'Equity + platform premium', 'kv-green'),
+    kpi('Exitwaarde downside', E.fmt(E.totaleWaarde(D.scenario_params.downside.yield_vastgoed_pct)), 'Yield ' + D.scenario_params.downside.yield_vastgoed_pct + '%', 'kv-red'),
+    kpi('Exit readiness', '58%', '7/12 KPIs behaald', 'kv-amber'),
+    kpi('Aanbevolen tijdlijn', 'Q3 2028', 'Na Eindhoven oplevering', 'kv-blue'),
+  ].join('');
+
+  const kpis = [
+    { cat: 'Earnings', kpi: 'Adj. EBITDA', huidig: E.fmt(E.totalNOI() * 0.79, 0), doel: '€1,5M+', status: 'amber' },
+    { cat: 'Vastgoed', kpi: 'Bezettingsgraad', huidig: '94%', doel: '95%+', status: 'amber' },
+    { cat: 'Vastgoed', kpi: 'WAULT (gewogen)', huidig: '2,8 jr', doel: '4,0 jr+', status: 'red' },
+    { cat: 'Financiering', kpi: 'LTV portefeuille', huidig: E.gewogenLTV().toFixed(0) + '%', doel: '<55%', status: E.gewogenLTV() < 55 ? 'green' : 'amber' },
+    { cat: 'Financiering', kpi: 'DSCR', huidig: E.dscr().toFixed(2), doel: '1,50+', status: E.dscr() >= 1.5 ? 'green' : 'amber' },
+    { cat: 'Structuur', kpi: 'Documentatie compleet', huidig: '65%', doel: '100%', status: 'red' },
+    { cat: 'Cash', kpi: 'Free cashflow/jr', huidig: E.fmt(E.totalNOI() - E.maandelijkseSchulddienst() * 12, 0), doel: '€600k+', status: 'amber' },
+    { cat: 'Portfolio', kpi: 'Concentratierisico', huidig: 'Middel', doel: 'Laag', status: 'amber' },
+    { cat: 'Portfolio', kpi: 'Audit trail 3 jr', huidig: 'Ja', doel: 'Ja', status: 'green' },
+  ];
+  document.getElementById('exit-kpi-tbl').innerHTML = `
+    <thead><tr><th>Categorie</th><th>KPI</th><th>Huidig</th><th>Exitdoel</th><th>Status</th></tr></thead>
+    <tbody>${kpis.map(k => `<tr><td>${k.cat}</td><td style="font-weight:600">${k.kpi}</td><td class="num">${k.huidig}</td><td>${k.doel}</td><td>${badge(k.status === 'green' ? 'Behaald' : k.status === 'amber' ? 'In progress' : 'Aandacht', k.status)}</td></tr>`).join('')}</tbody>`;
+
+  const risks = [
+    { naam: 'Hypotheek afloop zonder herfi', kans: 'Laag', impact: 'Zeer hoog', score: 'red', actie: 'Aanvraag indienen 3 mnd voor afloop' },
+    { naam: 'Bouwvertraging Eindhoven', kans: 'Middel', impact: 'Hoog', score: 'red', actie: 'Wekelijks bouwoverleg' },
+    { naam: 'Grote huurder vertrekt', kans: 'Middel', impact: 'Hoog', score: 'red', actie: 'Contractverlenging initiëren' },
+    { naam: 'Rentestijging +150bps', kans: 'Middel', impact: 'Middel', score: 'amber', actie: 'Vaste rente overwegen bij herfi' },
+    { naam: 'Acquisitie valt weg', kans: 'Laag', impact: 'Laag', score: 'blue', actie: 'Kasreserve beschikbaar' },
+    { naam: 'LTV-breach', kans: 'Laag', impact: 'Hoog', score: 'amber', actie: 'Bijstorten of taxatie verhogen' },
+  ];
+  document.getElementById('risk-tbl').innerHTML = `
+    <thead><tr><th>Risico</th><th>Kans</th><th>Impact</th><th>Score</th><th>Mitigatie</th></tr></thead>
+    <tbody>${risks.map(r => `<tr><td style="font-weight:600">${r.naam}</td><td>${r.kans}</td><td>${r.impact}</td><td>${badge(r.score === 'red' ? 'Hoog' : r.score === 'amber' ? 'Middel' : 'Laag', r.score)}</td><td style="color:var(--text-2)">${r.actie}</td></tr>`).join('')}</tbody>`;
+
+  const breekpunten = E.generateAlerts().filter(a => a.niveau === 'kritiek');
+  document.getElementById('breekpunten').innerHTML = (breekpunten.length
+    ? breekpunten.map(a => alertEl('kritiek', a.tekst))
+    : [alertEl('ok', 'Geen kritieke breekpunten gedetecteerd op basis van huidige data.')]
+  ).join('');
+}

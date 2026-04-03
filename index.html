@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fortis Vastgoed — Portfolio Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="sb-logo" id="sb-naam">Fortis Vastgoed</div>
+    <div class="sb-badge">Demo</div>
+
+    <div class="ns">Overzicht</div>
+    <a class="nav-item active" onclick="nav('exec',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1.5"/><rect x="8" y="1" width="5" height="5" rx="1.5"/><rect x="1" y="8" width="5" height="5" rx="1.5"/><rect x="8" y="8" width="5" height="5" rx="1.5"/></svg>
+      <span>Executive</span>
+    </a>
+    <a class="nav-item" onclick="nav('liq',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 4,6 7,8 10,3 13,5"/></svg>
+      <span>Liquiditeit</span>
+    </a>
+
+    <div class="ns">Projecten</div>
+    <a class="nav-item" onclick="nav('portfolio',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="3" height="9" rx="1"/><rect x="5.5" y="1" width="3" height="12" rx="1"/><rect x="10" y="6" width="3" height="7" rx="1"/></svg>
+      <span>Portefeuille</span>
+    </a>
+    <a class="nav-item" onclick="nav('timeline',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="7" x2="13" y2="7"/><circle cx="3.5" cy="7" r="2"/><circle cx="7" cy="7" r="2"/><circle cx="10.5" cy="7" r="2"/></svg>
+      <span>Timeline</span>
+    </a>
+    <a class="nav-item" onclick="nav('scenario',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12L4 7l3 2 3-5 3 2"/></svg>
+      <span>Scenario's</span>
+    </a>
+
+    <div class="ns">Financieel</div>
+    <a class="nav-item" onclick="nav('financiering',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="6"/><path d="M7 3.5v3.5l2.5 2"/></svg>
+      <span>Financiering</span>
+    </a>
+    <a class="nav-item" onclick="nav('covenant',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L1 4.5v4C1 11 3.5 12.5 7 13s6-2 6-4.5v-4L7 1z"/></svg>
+      <span>Covenants</span>
+    </a>
+    <a class="nav-item" onclick="nav('valuation',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12L4 8l3 2 4-7"/></svg>
+      <span>Waardering</span>
+    </a>
+
+    <div class="ns">Eigendom</div>
+    <a class="nav-item" onclick="nav('ownership',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="3.5" r="2.5"/><circle cx="3" cy="11" r="2"/><circle cx="11" cy="11" r="2"/><line x1="7" y1="6" x2="4.5" y2="9"/><line x1="7" y1="6" x2="9.5" y2="9"/></svg>
+      <span>Eigendom</span>
+    </a>
+    <a class="nav-item" onclick="nav('equity',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1v12M2.5 5.5L7 1l4.5 4.5"/></svg>
+      <span>Equity calls</span>
+    </a>
+    <a class="nav-item" onclick="nav('exit',this)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H2v10h10V8M8 1h5v5M8 6l5-5"/></svg>
+      <span>Exit &amp; Risk</span>
+    </a>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="main">
+
+    <!-- ---- EXECUTIVE ---- -->
+    <section class="page active" id="page-exec">
+      <div class="page-title" id="exec-title">Executive overzicht</div>
+      <div class="page-sub" id="exec-sub">Laden...</div>
+      <div class="kg g4" id="exec-kpis"></div>
+      <div class="kg g2">
+        <div class="card">
+          <div class="card-title">Kasverloop 24 maanden</div>
+          <div class="tabs">
+            <button class="tab-btn active-base" onclick="setExScen('base',this)">Base</button>
+            <button class="tab-btn" onclick="setExScen('up',this)">Upside</button>
+            <button class="tab-btn" onclick="setExScen('dn',this)">Downside</button>
+          </div>
+          <div style="position:relative;width:100%;height:160px"><canvas id="exChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Actieve meldingen</div>
+          <div id="exec-alerts"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Probability-gewogen pipeline</div>
+        <div style="overflow-x:auto"><table class="tbl" id="exec-pipeline"></table></div>
+      </div>
+    </section>
+
+    <!-- ---- LIQUIDITEIT ---- -->
+    <section class="page" id="page-liq">
+      <div class="page-title">Liquiditeitsforecast</div>
+      <div class="page-sub">24 maanden · Maandbasis · Alle cash events</div>
+      <div class="kg g4" id="liq-kpis"></div>
+      <div class="card">
+        <div class="card-title">Kasverloop — base vs downside</div>
+        <div class="tabs">
+          <button class="tab-btn active-base" onclick="setLiqScen('base',this)">Base</button>
+          <button class="tab-btn" onclick="setLiqScen('up',this)">Upside</button>
+          <button class="tab-btn" onclick="setLiqScen('dn',this)">Downside</button>
+        </div>
+        <div style="position:relative;width:100%;height:200px"><canvas id="liqChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cashflow tabel — 12 maanden</div>
+        <div style="overflow-x:auto"><table class="tbl" id="liq-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cash per entiteit</div>
+        <div style="overflow-x:auto"><table class="tbl" id="liq-entiteiten"></table></div>
+      </div>
+    </section>
+
+    <!-- ---- PORTFOLIO ---- -->
+    <section class="page" id="page-portfolio">
+      <div class="page-title">Portefeuille</div>
+      <div class="page-sub" id="port-sub">Laden...</div>
+      <div class="kg g4" id="port-kpis"></div>
+      <div class="card">
+        <div class="card-title">Objectoverzicht</div>
+        <div style="overflow-x:auto"><table class="tbl" id="port-tbl"></table></div>
+      </div>
+      <div class="kg g2">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">NOI per object (€k/jaar)</div>
+          <div style="position:relative;width:100%;height:180px"><canvas id="noiChart"></canvas></div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">LTV per object (%)</div>
+          <div style="position:relative;width:100%;height:180px"><canvas id="ltvChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- TIMELINE ---- -->
+    <section class="page" id="page-timeline">
+      <div class="page-title">Planning &amp; timeline</div>
+      <div class="page-sub">Gantt · Cash overlay · Afhankelijkheden</div>
+      <div class="kg g4" id="tl-kpis"></div>
+      <div class="card">
+        <div class="card-title">Gantt — alle projecten (24 maanden)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;font-size:10.5px" id="gantt-legend"></div>
+        <div class="gantt-wrap" id="gantt-container"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cash overlay</div>
+        <div style="position:relative;width:100%;height:200px"><canvas id="cashOverlayChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Kritieke dependencies</div>
+        <div id="dep-blocks"></div>
+      </div>
+    </section>
+
+    <!-- ---- SCENARIO ---- -->
+    <section class="page" id="page-scenario">
+      <div class="page-title">Scenario &amp; stress testing</div>
+      <div class="page-sub">Aanpasbare parameters · Gecombineerde scenario's</div>
+      <div class="card">
+        <div class="card-title">Parameters aanpassen</div>
+        <div class="kg g2" style="margin-bottom:0" id="scen-sliders"></div>
+      </div>
+      <div class="kg g4" id="scen-kpis"></div>
+      <div class="card">
+        <div class="card-title">Gecombineerde stress scenario's</div>
+        <div style="overflow-x:auto"><table class="tbl" id="scen-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Sensitivity — equity value (€M) bij yield × NOI-groei</div>
+        <div style="overflow-x:auto"><table class="sens-tbl" id="sens-tbl"></table></div>
+      </div>
+    </section>
+
+    <!-- ---- FINANCIERING ---- -->
+    <section class="page" id="page-financiering">
+      <div class="page-title">Financiering &amp; schuld</div>
+      <div class="page-sub" id="fin-sub">Laden...</div>
+      <div class="kg g4" id="fin-kpis"></div>
+      <div class="card">
+        <div class="card-title">Leningenoverzicht</div>
+        <div style="overflow-x:auto"><table class="tbl" id="fin-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Maturity profiel (€M per jaar)</div>
+        <div style="position:relative;width:100%;height:130px"><canvas id="matChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Bouwfinanciering tranches</div>
+        <div style="overflow-x:auto"><table class="tbl" id="tranche-tbl"></table></div>
+      </div>
+    </section>
+
+    <!-- ---- COVENANT ---- -->
+    <section class="page" id="page-covenant">
+      <div class="page-title">Covenant monitoring</div>
+      <div class="page-sub">LTV · DSCR · ICR · Breachsignalering</div>
+      <div class="kg g4" id="cov-kpis"></div>
+      <div class="card">
+        <div class="card-title">Covenant status — huidig vs limiet</div>
+        <div id="cov-bars"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Breach simulatie — scenario's</div>
+        <div style="overflow-x:auto"><table class="tbl" id="cov-sim-tbl"></table></div>
+      </div>
+    </section>
+
+    <!-- ---- WAARDERING ---- -->
+    <section class="page" id="page-valuation">
+      <div class="page-title">Waardering &amp; exitwaarde</div>
+      <div class="page-sub">NOI/yield · EBITDA multiple · Value bridge · Sensitivity</div>
+      <div class="card">
+        <div class="card-title">Parameters</div>
+        <div class="kg g2" style="margin-bottom:0" id="val-sliders"></div>
+      </div>
+      <div class="kg g4" id="val-kpis"></div>
+      <div class="kg g2">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">Scenario's</div>
+          <div id="val-scenarios"></div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">Value bridge</div>
+          <div id="val-bridge"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">Sensitivity — equity value (€M)</div>
+        <div style="overflow-x:auto"><table class="sens-tbl" id="val-sens"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Scenario-impact op equity</div>
+        <div style="position:relative;width:100%;height:200px"><canvas id="impactChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ---- OWNERSHIP ---- -->
+    <section class="page" id="page-ownership">
+      <div class="page-title">Eigendom &amp; groepsstructuur</div>
+      <div class="page-sub">Look-through · Directe en indirecte participaties</div>
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1;min-width:300px">
+          <svg width="100%" viewBox="0 0 420 470" id="org-svg">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+        <div style="width:200px;flex-shrink:0">
+          <p style="font-size:11.5px;color:var(--text-3);margin-bottom:8px">Klik op een entiteit voor details</p>
+          <div class="entity-detail" id="ent-detail" style="display:none">
+            <p style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:8px" id="ent-naam"></p>
+            <div id="ent-rows"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">Look-through economisch belang per eigenaar</div>
+        <div style="overflow-x:auto"><table class="tbl" id="lt-tbl"></table></div>
+      </div>
+    </section>
+
+    <!-- ---- EQUITY CALLS ---- -->
+    <section class="page" id="page-equity">
+      <div class="page-title">Equity calls per holding</div>
+      <div class="page-sub" id="eq-sub">Laden...</div>
+      <div class="kg g3" id="eq-kpis"></div>
+      <div class="card">
+        <div class="card-title">Equity call planning</div>
+        <div style="overflow-x:auto"><table class="tbl" id="eq-tbl"></table></div>
+      </div>
+      <div class="kg g2" id="eq-eigenaren"></div>
+    </section>
+
+    <!-- ---- EXIT & RISK ---- -->
+    <section class="page" id="page-exit">
+      <div class="page-title">Exit readiness &amp; risico</div>
+      <div class="page-sub">KPI-scorecard · Risicomatrix · Breekpunten</div>
+      <div class="kg g4" id="exit-kpis"></div>
+      <div class="card">
+        <div class="card-title">Exit KPI scorecard</div>
+        <div style="overflow-x:auto"><table class="tbl" id="exit-kpi-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Risicomatrix</div>
+        <div style="overflow-x:auto"><table class="tbl" id="risk-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Breekpunten van het systeem</div>
+        <div id="breekpunten"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="js/dashboard.js"></script>
+
+</body>
+</html>
