@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VastgoedCo — Portfolio dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #1b1b1b;
+    --sidebar: #161616;
+    --panel: #242424;
+    --tile: #292929;
+    --line: #333;
+    --text: #ececec;
+    --muted: #a3a3a3;
+    --dim: #8a8a8a;
+    --active: #232323;
+    --accent: #5b8def;
+    --blue: #6ea8f2;
+    --amber: #e9b44c;
+    --green: #9ccc65;
+    --red: #ef7e7e;
+    --crit-bg: #5b2b2b;  --crit-tx: #f3a6a6;  --crit-dot: #f28b8b;
+    --warn-bg: #4a3b12;  --warn-tx: #e8c35a;  --warn-dot: #e9b44c;
+    --info-bg: #24421d;  --info-tx: #a5d46e;  --info-dot: #9ccc65;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'Figtree', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar { width: 320px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid #222; padding: 34px 0 24px; }
+  .brand { padding: 0 28px 30px; }
+  .brand-name { font-size: 23px; font-weight: 600; letter-spacing: -.01em; }
+  .brand-sub { font-size: 17.5px; color: var(--muted); margin-top: 16px; }
+  .nav-section { font-size: 15px; letter-spacing: .08em; color: var(--muted); padding: 0 28px; margin: 6px 0 14px; }
+  .nav-section + .nav-item { margin-top: 0; }
+  .nav-item { display: flex; align-items: center; gap: 14px; padding: 14px 28px; font-size: 21px; color: #e2e2e2; cursor: pointer;
+              border-left: 3px solid transparent; user-select: none; }
+  .nav-item:hover { background: #1d1d1d; }
+  .nav-item.active { background: var(--active); border-left-color: var(--accent); font-weight: 600; color: #fff; }
+  .nav-item svg { width: 23px; height: 23px; stroke: currentColor; fill: none; stroke-width: 1.6; flex-shrink: 0; opacity: .9; }
+  .nav-group { margin-bottom: 26px; }
+
+  /* ---------- Main ---------- */
+  main { flex: 1; min-width: 0; padding: 34px 36px 48px; }
+  .page-title { font-size: 28px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+  .page-sub { font-size: 19px; color: var(--muted); margin: 10px 0 26px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .tile { background: var(--tile); border-radius: 12px; padding: 22px 22px 24px; min-height: 156px; }
+  .tile-label { font-size: 17.5px; color: var(--muted); }
+  .tile-value { font-size: 34px; font-weight: 600; margin: 14px 0 12px; letter-spacing: -.01em; line-height: 1.1; }
+  .tile-sub { font-size: 17.5px; color: var(--muted); line-height: 1.45; }
+  .c-blue { color: var(--blue); } .c-amber { color: var(--amber); } .c-green { color: var(--green); }
+  .c-red { color: var(--red); } .c-white { color: #f2f2f2; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 26px 26px; margin-bottom: 26px; }
+  .panel-title { font-size: 20px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #e4e4e4; margin: 0 0 20px; }
+
+  .alert { display: flex; gap: 12px; border-radius: 8px; padding: 13px 18px 13px 18px; margin-bottom: 11px; font-size: 19.5px; line-height: 1.4; }
+  .alert:last-child { margin-bottom: 0; }
+  .alert .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 9px; }
+  .alert b { font-weight: 700; }
+  .alert.kritiek  { background: var(--crit-bg); color: var(--crit-tx); } .alert.kritiek .dot { background: var(--crit-dot); }
+  .alert.aandacht { background: var(--warn-bg); color: var(--warn-tx); } .alert.aandacht .dot { background: var(--warn-dot); }
+  .alert.info     { background: var(--info-bg); color: var(--info-tx); } .alert.info .dot { background: var(--info-dot); }
+
+  .seg { display: inline-flex; gap: 10px; margin-bottom: 22px; }
+  .seg button { font: inherit; font-size: 22px; color: #ddd; background: transparent; border: 1px solid #3c3c3c; border-radius: 9px;
+                padding: 12px 28px; cursor: pointer; }
+  .seg button:hover { background: #2c2c2c; }
+  .seg button.on { background: #333; color: #fff; border-color: #555; }
+  .chart-wrap { position: relative; height: 320px; }
+  .legend { display: flex; gap: 20px; font-size: 14px; color: var(--muted); margin-top: 12px; flex-wrap: wrap; }
+  .legend span::before { content: ''; display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 7px; vertical-align: middle; background: var(--c); }
+
+  /* ---------- Tabellen (overige pagina's) ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 14px; padding: 0 12px 12px; border-bottom: 1px solid var(--line); }
+  td { padding: 13px 12px; border-bottom: 1px solid #2e2e2e; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pill { white-space: nowrap; }
+  .pill { display: inline-block; font-size: 13px; padding: 3px 10px; border-radius: 20px; background: #333; color: #ddd; }
+  .pill.red { background: var(--crit-bg); color: var(--crit-tx); }
+  .pill.amber { background: var(--warn-bg); color: var(--warn-tx); }
+  .pill.green { background: var(--info-bg); color: var(--info-tx); }
+  .table-scroll { overflow-x: auto; }
+  .page { display: none; }
+  .page.on { display: block; }
+
+  @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) {
+    .app { flex-direction: column; }
+    .sidebar { width: auto; padding: 18px 0 8px; border-right: 0; border-bottom: 1px solid #222; }
+    .brand { padding: 0 16px 14px; }
+    .nav-group { display: flex; flex-shrink: 0; margin: 0; }
+    .nav-section { display: none; }
+    .nav-item { padding: 10px 14px; font-size: 15px; border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .nav-item.active { border-bottom-color: var(--accent); }
+    .navs { display: flex; overflow-x: auto; scrollbar-width: none; }
+    .page-title { font-size: 23px; }
+    .page-sub { font-size: 16px; }
+    .panel { padding: 18px 16px; }
+    .panel-title { font-size: 16px; }
+    main { padding: 22px 16px 36px; }
+    .kpis { gap: 10px; }
+    .tile { padding: 14px; min-height: 0; }
+    .tile-value { font-size: 24px; }
+    .tile-label, .tile-sub { font-size: 14px; }
+    .alert { font-size: 15px; }
+    .seg button { font-size: 16px; padding: 9px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name" id="brand-name">VastgoedCo</div>
+      <div class="brand-sub">Portfolio dashboard</div>
+    </div>
+    <div class="navs">
+      <div class="nav-group">
+        <div class="nav-section">OVERZICHT</div>
+        <div class="nav-item active" data-page="management">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+          Management
+        </div>
+        <div class="nav-item" data-page="liquiditeit">
+          <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 4-6 5 4"/></svg>
+          Liquiditeit
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-section">ANALYSE</div>
+        <div class="nav-item" data-page="portefeuille">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="9" width="4" height="11" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1"/><rect x="16.5" y="12" width="4" height="8" rx="1"/></svg>
+          Portefeuille
+        </div>
+        <div class="nav-item" data-page="financiering">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+          Financiering
+        </div>
+        <div class="nav-item" data-page="waardering">
+          <svg viewBox="0 0 24 24"><path d="M3 18l6-6 4 3 8-8"/></svg>
+          Waardering
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-section">STRUCTUUR</div>
+        <div class="nav-item" data-page="groepsstructuur">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2.5"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M11 7.8L6.6 16.2M13 7.8l4.4 8.4M8 18.5h8"/></svg>
+          Groepsstructuur
+        </div>
+        <div class="nav-item" data-page="eigenaren">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 13.6c2.6.2 4.5 2 4.5 4.9"/></svg>
+          Eigenaren
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- MANAGEMENT -->
+    <section class="page on" id="page-management">
+      <h1 class="page-title">Management overzicht</h1>
+      <p class="page-sub" id="mgmt-sub"></p>
+      <div class="kpis" id="kpis"></div>
+
+      <div class="panel">
+        <h2 class="panel-title">Actieve meldingen</h2>
+        <div id="meldingen"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Kasverloop 24 maanden</h2>
+        <div class="seg" id="scenario-seg">
+          <button data-s="base" class="on">Base</button>
+          <button data-s="upside">Upside</button>
+          <button data-s="downside">Downside</button>
+        </div>
+        <div class="chart-wrap"><canvas id="kas-chart"></canvas></div>
+        <div class="legend" id="legend"></div>
+      </div>
+    </section>
+
+    <!-- LIQUIDITEIT -->
+    <section class="page" id="page-liquiditeit">
+      <h1 class="page-title">Liquiditeit</h1>
+      <p class="page-sub">Kasaldo einde maand per scenario · Min. kasbuffer <span id="liq-buffer"></span></p>
+      <div class="panel"><div class="table-scroll"><table id="liq-table"></table></div></div>
+    </section>
+
+    <!-- PORTEFEUILLE -->
+    <section class="page" id="page-portefeuille">
+      <h1 class="page-title">Portefeuille</h1>
+      <p class="page-sub">Objecten in eigendom, bouw en acquisitie</p>
+      <div class="panel"><div class="table-scroll"><table id="obj-table"></table></div></div>
+    </section>
+
+    <!-- FINANCIERING -->
+    <section class="page" id="page-financiering">
+      <h1 class="page-title">Financiering</h1>
+      <p class="page-sub">Leningen, rente en afloopdatums</p>
+      <div class="panel"><div class="table-scroll"><table id="len-table"></table></div></div>
+    </section>
+
+    <!-- WAARDERING -->
+    <section class="page" id="page-waardering">
+      <h1 class="page-title">Waardering</h1>
+      <p class="page-sub">Marktwaarde, schuld en eigen vermogen per object</p>
+      <div class="panel"><div class="table-scroll"><table id="waarde-table"></table></div></div>
+    </section>
+
+    <!-- GROEPSSTRUCTUUR -->
+    <section class="page" id="page-groepsstructuur">
+      <h1 class="page-title">Groepsstructuur</h1>
+      <p class="page-sub">Juridische entiteiten</p>
+      <div class="panel"><div class="table-scroll"><table id="ent-table"></table></div></div>
+    </section>
+
+    <!-- EIGENAREN -->
+    <section class="page" id="page-eigenaren">
+      <h1 class="page-title">Eigenaren</h1>
+      <p class="page-sub">Aandeelhouders en participaties</p>
+      <div class="panel"><div class="table-scroll"><table id="eig-table"></table></div></div>
+    </section>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+  // ---------- Opmaak ----------
+  function eur(x) {
+    const a = Math.abs(x), s = x < 0 ? '−' : '';
+    if (a >= 1e6) return s + '€ ' + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '').replace('.', ',') + 'M';
+    if (a >= 1e3) return s + '€ ' + Math.round(a / 1e3) + 'k';
+    return s + '€ ' + Math.round(a);
+  }
+  const eurFull = x => '€ ' + Math.round(x).toLocaleString('nl-NL');
+  const nl = (x, d) => x.toFixed(d).replace('.', ',');
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const D = DATA, K = D.kpi;
+  document.getElementById('brand-name').textContent = D.bedrijf;
+  document.title = D.bedrijf + ' — Portfolio dashboard';
+  document.getElementById('mgmt-sub').textContent = `Portefeuille · ${D.periode} · Alle bedragen in euro`;
+
+  // ---------- KPI-tegels ----------
+  const kritiek = D.meldingen.filter(m => m.niveau === 'kritiek').length;
+  const aandacht = D.meldingen.filter(m => m.niveau === 'aandacht').length;
+  const tiles = [
+    ['Kasaldo vandaag', eur(K.kasaldo), 'c-blue', `${K.kasaldoMutatie >= 0 ? '▲ +' : '▼ −'}${eur(Math.abs(K.kasaldoMutatie))} vs ${D.vorigeMaand}`],
+    ['Min. kasaldo 12m', eur(K.minKasaldo12m), K.minKasaldo12m < 0 ? 'c-red' : K.minKasaldo12m < D.minKasbuffer ? 'c-amber' : 'c-green', `Verwacht ${K.minKasaldoMaand}`],
+    ['NAV portefeuille', eur(K.nav), 'c-green', 'Marktwaarde − schuld'],
+    ['DSCR portefeuille', nl(K.dscr, 2), K.dscr < K.dscrMin ? 'c-red' : K.dscr < K.dscrMin + 0.1 ? 'c-amber' : 'c-green', `Min. eis: ${nl(K.dscrMin, 2)}`],
+    ['Totale NOI (jaar)', eur(K.noiJaar), 'c-white', `${K.actieveObjecten} actieve objecten`],
+    ['Portefeuille IRR', nl(K.irrPct, 1) + '%', 'c-green', 'Gewogen gemiddeld'],
+    ['Totale schuld', eur(K.schuld), 'c-red', `LTV ${K.ltvPct}%`],
+    ['Actieve alerts', String(kritiek + aandacht), kritiek ? 'c-red' : aandacht ? 'c-amber' : 'c-green', `${kritiek} kritiek · ${aandacht} aandacht`],
+  ];
+  document.getElementById('kpis').innerHTML = tiles.map(([l, v, c, s]) =>
+    `<div class="tile"><div class="tile-label">${l}</div><div class="tile-value ${c}">${v}</div><div class="tile-sub">${esc(s)}</div></div>`).join('');
+
+  // ---------- Meldingen ----------
+  const label = { kritiek: 'Kritiek', aandacht: 'Aandacht', info: 'Info' };
+  document.getElementById('meldingen').innerHTML = D.meldingen.map(m =>
+    `<div class="alert ${m.niveau}"><span class="dot"></span><div><b>${label[m.niveau]}</b> — ${esc(m.tekst)}</div></div>`).join('');
+
+  // ---------- Kasverloop ----------
+  const kleur = { base: '#6ea8f2', upside: '#9ccc65', downside: '#ef7e7e' };
+  const naam = { base: 'Base', upside: 'Upside', downside: 'Downside' };
+  if (window.Chart) { Chart.defaults.font.family = "'Figtree', system-ui, sans-serif"; Chart.defaults.color = '#8a8a8a'; }
+  let scenario = 'base', chart;
+
+  function drawChart() {
+    const ctx = document.getElementById('kas-chart');
+    if (!window.Chart) { ctx.parentElement.innerHTML = '<p class="tile-sub">Grafiek kon niet laden (geen internetverbinding).</p>'; return; }
+    const datasets = ['upside', 'base', 'downside'].map(s => ({
+      label: naam[s], data: D.kasverloop[s], borderColor: kleur[s],
+      backgroundColor: s === scenario ? kleur[s] + '22' : 'transparent',
+      borderWidth: s === scenario ? 2.5 : 1.25, fill: s === scenario,
+      pointRadius: 0, pointHoverRadius: 4, cubicInterpolationMode: 'monotone',
+      borderDash: s === scenario ? [] : [4, 4], order: s === scenario ? 0 : 1,
+    }));
+    datasets.push({ label: 'Min. kasbuffer', data: D.maanden.map(() => D.minKasbuffer), borderColor: '#e9b44c',
+      borderDash: [6, 5], borderWidth: 1.25, pointRadius: 0, fill: false });
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: D.maanden, datasets },
+      options: {
+        maintainAspectRatio: false, animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: '#111', borderColor: '#333', borderWidth: 1, padding: 10,
+            callbacks: { label: c => ` ${c.dataset.label}: ${eurFull(c.parsed.y)}` } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8a8a8a', font: { family: 'Figtree', size: 12 }, maxRotation: 0, autoSkipPadding: 12 } },
+          y: { grid: { color: '#2f2f2f' }, border: { display: false },
+               ticks: { color: '#8a8a8a', font: { family: 'Figtree', size: 12 }, callback: v => eur(v) } },
+        },
+      },
+    });
+    document.getElementById('legend').innerHTML =
+      ['base', 'upside', 'downside'].map(s => `<span style="--c:${kleur[s]}">${naam[s]}</span>`).join('') +
+      `<span style="--c:#e9b44c">Min. kasbuffer ${eur(D.minKasbuffer)}</span>`;
+  }
+  document.getElementById('scenario-seg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    scenario = b.dataset.s;
+    document.querySelectorAll('#scenario-seg button').forEach(x => x.classList.toggle('on', x === b));
+    drawChart();
+  });
+
+  // ---------- Overige pagina's ----------
+  function table(id, head, rows) {
+    document.getElementById(id).innerHTML =
+      '<thead><tr>' + head.map(h => `<th class="${h.num ? 'num' : ''}">${h.t}</th>`).join('') + '</tr></thead><tbody>' +
+      rows.map(r => '<tr>' + r.map((c, i) => `<td class="${head[i].num ? 'num' : ''}">${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+  }
+  const statusPill = s => {
+    const cls = /geen/i.test(s) ? 'red' : /herfi|tranche|bouw/i.test(s) ? 'amber' : /actief|eigendom/i.test(s) ? 'green' : '';
+    return `<span class="pill ${cls}">${esc(s)}</span>`;
+  };
+
+  document.getElementById('liq-buffer').textContent = eur(D.minKasbuffer);
+  const cel = v => `<span class="${v < 0 ? 'c-red' : v < D.minKasbuffer ? 'c-amber' : ''}">${eurFull(v)}</span>`;
+  table('liq-table', [{ t: 'Maand' }, { t: 'Base', num: 1 }, { t: 'Upside', num: 1 }, { t: 'Downside', num: 1 }],
+    D.maanden.map((m, i) => [m, cel(D.kasverloop.base[i]), cel(D.kasverloop.upside[i]), cel(D.kasverloop.downside[i])]));
+
+  table('obj-table', [{ t: 'Object' }, { t: 'Type' }, { t: 'Status' }, { t: 'Huur / mnd', num: 1 }, { t: 'NOI-basis / jaar', num: 1 }, { t: 'IRR', num: 1 }],
+    D.objecten.map(o => [esc(o.naam), esc(o.type), statusPill(o.status), o.huurMaand ? eurFull(o.huurMaand) : '—',
+      o.huurMaand ? eurFull(o.huurMaand * 12) : '—', o.irr != null ? nl(o.irr, 1) + '%' : '—']));
+
+  table('len-table', [{ t: 'Lening' }, { t: 'Geldgever' }, { t: 'Saldo', num: 1 }, { t: 'Rente', num: 1 }, { t: 'Aflossing' }, { t: 'Einddatum' }, { t: 'Status' }],
+    D.leningen.map(l => [esc(l.naam), esc(l.geldgever), eurFull(l.saldo), nl(l.rente, 1) + '%', esc(l.aflossing), esc(l.einde), statusPill(l.status)]));
+
+  const w = D.objecten.filter(o => o.marktwaarde);
+  table('waarde-table', [{ t: 'Object' }, { t: 'Marktwaarde', num: 1 }, { t: 'Schuld', num: 1 }, { t: 'Eigen vermogen', num: 1 }, { t: 'LTV', num: 1 }],
+    w.map(o => [esc(o.naam), eurFull(o.marktwaarde), eurFull(o.schuld), eurFull(o.marktwaarde - o.schuld), Math.round(100 * o.schuld / o.marktwaarde) + '%'])
+     .concat([[ '<b>Totaal</b>', '<b>' + eurFull(w.reduce((s, o) => s + o.marktwaarde, 0)) + '</b>', '<b>' + eurFull(w.reduce((s, o) => s + o.schuld, 0)) + '</b>',
+       '<b>' + eurFull(w.reduce((s, o) => s + o.marktwaarde - o.schuld, 0)) + '</b>',
+       '<b>' + Math.round(100 * w.reduce((s, o) => s + o.schuld, 0) / w.reduce((s, o) => s + o.marktwaarde, 0)) + '%</b>' ]]));
+
+  table('ent-table', [{ t: 'Entiteit' }, { t: 'Type' }, { t: 'Objecten' }], D.entiteiten.map(e => [esc(e.naam), esc(e.type), esc(e.objecten)]));
+  table('eig-table', [{ t: 'Eigenaar' }, { t: 'Holding' }, { t: 'Participatie', num: 1 }], D.eigenaren.map(e => [esc(e.naam), esc(e.holding), e.pct + '%']));
+
+  // ---------- Navigatie ----------
+  function go(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'page-' + page));
+    if (page === 'management') drawChart();
+    try { history.replaceState(null, '', '#' + page); } catch (e) {}
+  }
+  document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => go(n.dataset.page)));
+  const start = location.hash.slice(1);
+  go(document.getElementById('page-' + start) ? start : 'management');
+  // opnieuw tekenen zodra het lettertype geladen is
+  if (document.fonts) document.fonts.ready.then(() => { if (chart) drawChart(); });
+</script>
+</body>
+</html>
