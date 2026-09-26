@@ -14,12 +14,41 @@ window.ENGINE = (function () {
   const fmt = (v, dec = 1) => {
     if (v === null || v === undefined) return '—';
     const a = Math.abs(v), s = v < 0 ? '-' : '';
-    if (a >= 1e6) return s + '€\u00a0' + (a / 1e6).toFixed(dec) + 'M';
+    if (a >= 1e6) return s + '€\u00a0' + (a / 1e6).toFixed(dec).replace('.', ',') + 'M';
     if (a >= 1e3) return s + '€\u00a0' + Math.round(a / 1e3) + 'k';
     return s + '€\u00a0' + Math.round(a);
   };
-  const pct = (v, dec = 1) => v == null ? '—' : v.toFixed(dec) + '%';
+  const pct = (v, dec = 1) => v == null ? '—' : v.toFixed(dec).replace('.', ',') + '%';
   const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+
+  // ---------- DATUMS ----------
+  const MAANDEN_KORT = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  const MAANDEN_LANG = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+  // Accepteert "YYYY-MM" en "YYYY-MM-DD"; geeft [jaar, maandIndex 0-11, dag]
+  function parseDatum(str) {
+    const [j, m, d] = String(str).split('-').map(Number);
+    return [j, (m || 1) - 1, d || 1];
+  }
+  function peildatum() {
+    const [j, m, d] = parseDatum(data().meta.peildatum);
+    return new Date(j, m, d);
+  }
+  // "2026-08-15" → "15 aug 2026", "2026-08" → "aug 2026"
+  function fmtDatum(str) {
+    if (!str) return '—';
+    const parts = String(str).split('-');
+    const [j, m, d] = parseDatum(str);
+    return (parts.length > 2 ? d + ' ' : '') + MAANDEN_KORT[m] + ' ' + j;
+  }
+  function maandJaarLang(str) {
+    const [j, m] = parseDatum(str);
+    const naam = MAANDEN_LANG[m];
+    return naam.charAt(0).toUpperCase() + naam.slice(1) + ' ' + j;
+  }
+  function maandenTot(str) {
+    const [j, m, d] = parseDatum(str);
+    return (new Date(j, m, d) - peildatum()) / (1000 * 60 * 60 * 24 * 30.44);
+  }
 
   // ---------- KAS ----------
   function totaleKas() {
@@ -167,6 +196,15 @@ window.ENGINE = (function () {
       gewogen_bedrag: t.bedrag * (t.kans_pct / 100),
     }));
   }
+  // ---------- IRR ----------
+  // Gewogen gemiddelde (op marktwaarde) van de irr_pct per object in data.js
+  function portefeuilleIRR() {
+    const items = data().objecten.filter(o => typeof o.irr_pct === 'number' && o.marktwaarde);
+    const totaal = items.reduce((s, o) => s + o.marktwaarde, 0);
+    if (!totaal) return null;
+    return items.reduce((s, o) => s + o.irr_pct * o.marktwaarde, 0) / totaal;
+  }
+
   function gewogenEquityCall() {
     return data().transacties
       .filter(t => t.type === 'equity_call')
@@ -174,19 +212,29 @@ window.ENGINE = (function () {
   }
 
   // ---------- ALERTS ----------
+  // niveau: 'kritiek' | 'aandacht' | 'info'
   function generateAlerts() {
     const alerts = [];
-    const nu = new Date();
+    const drempel = data().meta.minimum_kas_drempel;
 
-    // Leningen die binnen 9 maanden aflopen zonder herfi
+    // Kasaldo zakt onder de minimumdrempel (base scenario, 12 maanden)
+    const cf = cashflowForecast(12, 'base');
+    const eersteTekort = cf.find(m => m.sluitend_kas < drempel);
+    if (eersteTekort) {
+      alerts.push({
+        niveau: 'kritiek',
+        tekst: `Kasaldo daalt onder ${fmt(drempel)} in ${fmtDatum(eersteTekort.maandStr)} (verwacht ${fmt(eersteTekort.sluitend_kas)}).`,
+      });
+    }
+
+    // Leningen die binnen 9 maanden aflopen
     data().leningen.forEach(l => {
       if (!l.einddatum) return;
-      const eind = new Date(l.einddatum);
-      const maanden = (eind - nu) / (1000 * 60 * 60 * 24 * 30);
+      const maanden = maandenTot(l.einddatum);
       if (maanden < 9 && maanden > 0) {
         alerts.push({
-          niveau: maanden < 3 ? 'kritiek' : 'aandacht',
-          tekst: `Lening ${l.naam} loopt af ${l.einddatum}. Saldo: ${fmt(l.huidig_saldo)}. Herfi-aanvraag vereist.`,
+          niveau: maanden < 6 ? 'kritiek' : 'aandacht',
+          tekst: `Lening ${l.naam} (${fmt(l.huidig_saldo)}) loopt af ${fmtDatum(l.einddatum)}. Herfi-aanvraag vereist, doorlooptijd 8–12 weken.`,
         });
       }
     });
@@ -194,13 +242,12 @@ window.ENGINE = (function () {
     // Huurcontracten die binnen 12 maanden verlopen
     data().huurcontracten.forEach(h => {
       if (!h.einddatum) return;
-      const eind = new Date(h.einddatum);
-      const maanden = (eind - nu) / (1000 * 60 * 60 * 24 * 30);
+      const maanden = maandenTot(h.einddatum);
       if (maanden < 12 && maanden > 0) {
         const obj = data().objecten.find(o => o.id === h.object_id);
         alerts.push({
-          niveau: maanden < 6 ? 'kritiek' : 'aandacht',
-          tekst: `Huurcontract ${h.huurder} (${obj?.naam || h.object_id}) verloopt ${h.einddatum}. €${Math.round(h.huur_per_maand / 1000)}k/mnd.`,
+          niveau: maanden < 3 ? 'kritiek' : 'aandacht',
+          tekst: `Huurcontract ${h.huurder} — ${obj ? obj.stad : h.object_id} (${fmt(h.huur_per_maand)}/mnd) verloopt ${fmtDatum(h.einddatum)}. Heronderhandeling starten.`,
         });
       }
     });
@@ -213,7 +260,7 @@ window.ENGINE = (function () {
       if (max && o.ltv > max * 0.92) {
         alerts.push({
           niveau: o.ltv > max ? 'kritiek' : 'aandacht',
-          tekst: `${o.naam}: LTV ${o.ltv.toFixed(0)}% nadert max ${max}%.`,
+          tekst: `${o.naam} (${o.stad}): LTV ${o.ltv.toFixed(0)}% nadert covenant-max ${max}%.`,
         });
       }
     });
@@ -223,11 +270,27 @@ window.ENGINE = (function () {
     if (d < 1.30 && d > 0) {
       alerts.push({
         niveau: d < 1.20 ? 'kritiek' : 'aandacht',
-        tekst: `Portefeuille DSCR ${d.toFixed(2)} — minimumeis banken 1,20. Buffer smal.`,
+        tekst: `Portefeuille DSCR ${d.toFixed(2).replace('.', ',')} — minimumeis banken 1,20. Buffer smal.`,
       });
     }
 
-    return alerts;
+    // Info: voortgang bouwprojecten (laatst getrokken tranche)
+    data().objecten.filter(o => o.status === 'bouw').forEach(o => {
+      const lening = data().leningen.find(l => l.object_id === o.id && l.type === 'bouwfinanciering');
+      if (!lening) return;
+      const tranches = data().bouw_tranches.filter(t => t.lening_id === lening.id);
+      const getrokken = tranches.filter(t => t.status === 'getrokken').sort((a, b) => a.nr - b.nr).pop();
+      if (!getrokken) return;
+      const volgende = tranches.filter(t => t.nr > getrokken.nr).sort((a, b) => a.nr - b.nr)[0];
+      alerts.push({
+        niveau: 'info',
+        tekst: `Bouwproject ${o.stad}: tranche ${getrokken.nr} (${fmt(getrokken.bedrag)}) getrokken ${fmtDatum(getrokken.datum)}.` +
+          (volgende ? ` Volgende: tranche ${volgende.nr} (${fmt(volgende.bedrag)}) ${fmtDatum(volgende.datum.substring(0, 7))}.` : ''),
+      });
+    });
+
+    const volgorde = { kritiek: 0, aandacht: 1, info: 2 };
+    return alerts.sort((a, b) => volgorde[a.niveau] - volgorde[b.niveau]);
   }
 
   // ---------- MAANDELIJKSE CASHFLOW FORECAST ----------
@@ -280,9 +343,9 @@ window.ENGINE = (function () {
   }
 
   function offsetMaand(startDatum, maanden) {
-    const d = new Date(startDatum + '-01');
-    d.setMonth(d.getMonth() + maanden);
-    return d.toISOString().substring(0, 7);
+    const [j, m] = parseDatum(startDatum);
+    const d = new Date(j, m + maanden, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   }
 
   // ---------- SCENARIO SUMMARY ----------
@@ -299,10 +362,9 @@ window.ENGINE = (function () {
   // ---------- MAAND LABELS ----------
   function maandLabels(n = 24) {
     const namen = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
-    const start = new Date(data().meta.peildatum + '-01');
+    const [j, m] = parseDatum(data().meta.peildatum);
     return Array.from({ length: n }, (_, i) => {
-      const d = new Date(start);
-      d.setMonth(d.getMonth() + i);
+      const d = new Date(j, m + i, 1);
       return namen[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2);
     });
   }
@@ -310,6 +372,8 @@ window.ENGINE = (function () {
   // ---------- PUBLIEKE API ----------
   return {
     fmt, pct, clamp,
+    parseDatum, peildatum, fmtDatum, maandJaarLang, maandenTot, offsetMaand,
+    portefeuilleIRR,
     totaleKas, beschikbareKas, kasPerEntiteit,
     jaarlijkseHuur, maandelijkseHuur,
     jaarlijkseKosten,

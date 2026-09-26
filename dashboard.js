@@ -10,6 +10,19 @@ const E = window.ENGINE;
 const D = window.FORTIS_DATA;
 const MND = E.maandLabels(24);
 
+// ---- CHART.JS — DONKER THEMA ----
+Chart.defaults.color = '#9b9b9b';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif";
+Chart.defaults.plugins.tooltip.backgroundColor = '#111';
+Chart.defaults.plugins.tooltip.borderColor = 'rgba(255,255,255,0.12)';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+const SCEN_KLEUR = {
+  base: { c: '#6fa8ee', f: 'rgba(111,168,238,0.12)' },
+  up:   { c: '#86c96b', f: 'rgba(134,201,107,0.12)' },
+  dn:   { c: '#f0857a', f: 'rgba(240,133,122,0.12)' },
+};
+
 // ---- NAVIGATIE ----
 function nav(id, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -18,21 +31,18 @@ function nav(id, el) {
   el.classList.add('active');
   // Lazy-build charts when page is first visited
   const builders = {
-    liq: buildLiq,
-    portfolio: buildPortfolio,
-    timeline: buildTimeline,
-    scenario: buildScenario,
-    financiering: buildFinanciering,
-    covenant: buildCovenant,
-    valuation: buildValuation,
-    ownership: buildOwnership,
-    equity: buildEquity,
-    exit: buildExit,
+    liq: [buildLiq],
+    portfolio: [buildPortfolio, buildTimeline, buildScenario],
+    financiering: [buildFinanciering, buildCovenant],
+    valuation: [buildValuation, buildExit],
+    ownership: [buildOwnership],
+    equity: [buildLookThrough, buildEquity],
   };
   if (builders[id] && !el.dataset.built) {
-    builders[id]();
+    builders[id].forEach(fn => fn());
     el.dataset.built = '1';
   }
+  window.scrollTo(0, 0);
 }
 
 // ---- HELPERS ----
@@ -40,9 +50,14 @@ const badge = (txt, cls) => `<span class="badge badge-${cls}">${txt}</span>`;
 const kpi = (label, val, sub, colorCls = '') =>
   `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value ${colorCls}">${val}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
 const alertEl = (level, txt) => {
-  const map = { kritiek: ['alert-red', 'dot-red'], aandacht: ['alert-amber', 'dot-amber'], info: ['alert-blue', 'dot-blue'], ok: ['alert-green', 'dot-green'] };
-  const [ac, dc] = map[level] || map.info;
-  return `<div class="alert ${ac}"><div class="alert-dot ${dc}"></div><div>${txt}</div></div>`;
+  const map = {
+    kritiek:  ['alert-red', 'dot-red', 'Kritiek'],
+    aandacht: ['alert-amber', 'dot-amber', 'Aandacht'],
+    info:     ['alert-green', 'dot-green', 'Info'],
+    ok:       ['alert-green', 'dot-green', 'OK'],
+  };
+  const [ac, dc, label] = map[level] || map.info;
+  return `<div class="alert ${ac}"><div class="alert-dot ${dc}"></div><div><strong>${label}</strong> — ${txt}</div></div>`;
 };
 const statusBadge = s => {
   const m = { eigendom: 'green', herfi: 'blue', bouw: 'amber', acquisitie: 'purple', verkoop: 'red', lopend: 'blue' };
@@ -52,35 +67,56 @@ const certBadge = c => c === 'committed'
   ? badge('Committed', 'green')
   : c === 'expected' ? badge('Expected', 'amber') : badge('Oriëntatie', 'gray');
 
-// ---- INIT: META & EXECUTIVE ----
+// ---- CHART-INSTANTIES ----
+let exC = null;
+
+// ---- INIT: META & MANAGEMENT ----
 (function initExec() {
   document.getElementById('sb-naam').textContent = D.meta.bedrijfsnaam;
-  document.title = D.meta.bedrijfsnaam + ' — Dashboard';
-  document.getElementById('exec-title').textContent = 'Executive overzicht — ' + D.meta.bedrijfsnaam;
+  document.getElementById('sb-sub').textContent = D.meta.subtitel || 'Portfolio dashboard';
+  document.title = D.meta.bedrijfsnaam + ' — ' + (D.meta.subtitel || 'Portfolio dashboard');
   document.getElementById('exec-sub').textContent =
-    `${D.objecten.length} objecten · ${D.eigenaren.length} eigenaren · Peildatum ${D.meta.peildatum}`;
+    `Portefeuille · ${E.maandJaarLang(D.meta.peildatum)} · Alle bedragen in euro`;
 
   const totKas = E.totaleKas();
-  const cfBase = E.cashflowForecast(24, 'base');
-  const minKas = Math.min(...cfBase.map(m => m.sluitend_kas));
-  const minM = MND[cfBase.findIndex(m => m.sluitend_kas === minKas)];
+  const cf12 = E.cashflowForecast(12, 'base');
+  const minKas = Math.min(...cf12.map(m => m.sluitend_kas));
+  const minMaand = cf12.find(m => m.sluitend_kas === minKas);
   const totSch = E.totaleSculd();
   const navVal = E.nav();
-  const eqCalls = E.gewogenEquityCall();
+  const dscr = E.dscr();
+  const irr = E.portefeuilleIRR();
+  const alerts = E.generateAlerts();
+  const nKritiek = alerts.filter(a => a.niveau === 'kritiek').length;
+  const nAandacht = alerts.filter(a => a.niveau === 'aandacht').length;
+  const actieveObjecten = E.noiPerObject().filter(o => o.huur_jaar > 0).length;
+  const drempel = D.meta.minimum_kas_drempel;
+
+  // Kasaldo t.o.v. vorige maand (optioneel veld in data.js)
+  let kasSub = 'Over ' + D.kasstand.length + ' entiteiten';
+  if (typeof D.meta.kasaldo_vorige_maand === 'number') {
+    const delta = totKas - D.meta.kasaldo_vorige_maand;
+    const [j, m] = E.parseDatum(D.meta.peildatum);
+    const vorige = E.fmtDatum(E.offsetMaand(`${j}-${m + 1}`, -1)).split(' ')[0];
+    kasSub = `${delta >= 0 ? '▲ +' : '▼ '}${E.fmt(delta)} vs ${vorige}`;
+  }
 
   document.getElementById('exec-kpis').innerHTML = [
-    kpi('Kasaldo vandaag', E.fmt(totKas), 'Over ' + D.kasstand.length + ' entiteiten', 'kv-blue'),
-    kpi('Min. kasaldo 12m', E.fmt(minKas), minM + ' — ' + (minKas < D.meta.minimum_kas_drempel * 1.5 ? 'aandacht' : 'ok'), minKas < D.meta.minimum_kas_drempel ? 'kv-red' : 'kv-amber'),
+    kpi('Kasaldo vandaag', E.fmt(totKas, 2), kasSub, 'kv-blue'),
+    kpi('Min. kasaldo 12m', E.fmt(minKas), 'Verwacht ' + E.fmtDatum(minMaand.maandStr),
+      minKas < drempel ? 'kv-red' : 'kv-amber'),
     kpi('NAV portefeuille', E.fmt(navVal), 'Marktwaarde − schuld', 'kv-green'),
-    kpi('Equity calls 12m', E.fmt(eqCalls), D.transacties.filter(t => t.type === 'equity_call').length + ' geplande calls', 'kv-red'),
-    kpi('Totale NOI/jaar', E.fmt(E.totalNOI()), D.huurcontracten.length + ' actieve huurcontracten'),
-    kpi('DSCR portefeuille', E.dscr().toFixed(2), 'Min. eis banken: 1,20', E.dscr() >= 1.4 ? 'kv-green' : E.dscr() >= 1.2 ? 'kv-amber' : 'kv-red'),
-    kpi('Totale schuld', E.fmt(totSch), 'LTV gew. gem. ' + E.gewogenLTV().toFixed(0) + '%', 'kv-red'),
-    kpi('Exitwaarde (base)', E.fmt(E.totaleWaarde()), 'Equity + premium', 'kv-green'),
+    kpi('DSCR portefeuille', dscr.toFixed(2).replace('.', ','), 'Min. eis: 1,20',
+      dscr >= 1.3 ? 'kv-green' : dscr >= 1.2 ? 'kv-amber' : 'kv-red'),
+    kpi('Totale NOI (jaar)', E.fmt(E.totalNOI()), actieveObjecten + ' actieve objecten'),
+    kpi('Portefeuille IRR', irr === null ? '—' : irr.toFixed(1).replace('.', ',') + '%',
+      irr === null ? 'Vul irr_pct in data.js' : 'Gewogen gemiddeld', 'kv-green'),
+    kpi('Totale schuld', E.fmt(totSch), 'LTV ' + E.gewogenLTV().toFixed(0) + '%', 'kv-red'),
+    kpi('Actieve alerts', String(nKritiek + nAandacht), `${nKritiek} kritiek · ${nAandacht} aandacht`,
+      nKritiek ? 'kv-red' : nAandacht ? 'kv-amber' : 'kv-green'),
   ].join('');
 
   // Alerts
-  const alerts = E.generateAlerts();
   document.getElementById('exec-alerts').innerHTML = (alerts.length
     ? alerts.map(a => alertEl(a.niveau, a.tekst))
     : [alertEl('ok', 'Geen kritieke meldingen op dit moment.')]
@@ -108,18 +144,18 @@ const certBadge = c => c === 'committed'
 })();
 
 // ---- EXECUTIVE CHART ----
-let exC = null;
 function buildExChart(scen) {
-  const data = {
-    base: { d: E.cashflowForecast(24, 'base').map(m => m.sluitend_kas), c: '#1a5fa8', f: 'rgba(26,95,168,0.07)' },
-    up: { d: E.cashflowForecast(24, 'upside').map(m => m.sluitend_kas), c: '#2d7a4f', f: 'rgba(45,122,79,0.07)' },
-    dn: { d: E.cashflowForecast(24, 'downside').map(m => m.sluitend_kas), c: '#c0392b', f: 'rgba(192,57,43,0.07)' },
-  }[scen];
+  const naam = { base: 'base', up: 'upside', dn: 'downside' }[scen];
+  const d = E.cashflowForecast(24, naam).map(m => m.sluitend_kas);
+  const k = SCEN_KLEUR[scen];
   if (exC) exC.destroy();
   exC = new Chart(document.getElementById('exChart'), {
     type: 'line',
-    data: { labels: MND, datasets: [{ data: data.d, borderColor: data.c, backgroundColor: data.f, borderWidth: 2, fill: true, tension: 0.35, pointRadius: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82', maxTicksLimit: 8 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => '€' + (v / 1e6).toFixed(1) + 'M' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+    data: { labels: MND, datasets: [
+      { label: 'Kasaldo', data: d, borderColor: k.c, backgroundColor: k.f, borderWidth: 2, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 4 },
+      { label: 'Min. drempel', data: new Array(24).fill(D.meta.minimum_kas_drempel), borderColor: '#f0857a', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 11 }, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: { font: { size: 11 }, callback: v => E.fmt(v) } } } },
   });
 }
 function setExScen(s, btn) {
@@ -185,16 +221,15 @@ function buildLiqChart(scen) {
   const up = E.cashflowForecast(24, 'upside').map(m => m.sluitend_kas);
   const thresh = new Array(24).fill(D.meta.minimum_kas_drempel);
   const selected = scen === 'up' ? up : scen === 'dn' ? dn : base;
-  const colors = { base: '#1a5fa8', up: '#2d7a4f', dn: '#c0392b' };
-  const col = colors[scen] || '#1a5fa8';
+  const col = (SCEN_KLEUR[scen] || SCEN_KLEUR.base).c;
   if (liqC) liqC.destroy();
   liqC = new Chart(document.getElementById('liqChart'), {
     type: 'line',
     data: { labels: MND, datasets: [
-      { label: 'Kasverloop', data: selected, borderColor: col, backgroundColor: col + '11', borderWidth: 2, fill: true, tension: 0.35, pointRadius: 2 },
-      { label: 'Min. drempel', data: thresh, borderColor: '#c0392b', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0 },
+      { label: 'Kasverloop', data: selected, borderColor: col, backgroundColor: col + '1f', borderWidth: 2, fill: true, tension: 0.35, pointRadius: 2 },
+      { label: 'Min. drempel', data: thresh, borderColor: '#f0857a', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0 },
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82', maxTicksLimit: 10 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => E.fmt(v) }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 10 }, maxTicksLimit: 10 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => E.fmt(v) }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
   });
 }
 function setLiqScen(s, btn) {
@@ -243,15 +278,15 @@ function buildPortfolio() {
   const verhuurde = nois.filter(o => o.noi > 0);
   new Chart(document.getElementById('noiChart'), {
     type: 'bar',
-    data: { labels: verhuurde.map(o => o.naam.split(' ')[0]), datasets: [{ data: verhuurde.map(o => Math.round(o.noi / 1000)), backgroundColor: '#85B7EB', borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82' }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => v + 'k' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+    data: { labels: verhuurde.map(o => o.naam.split(' ')[0]), datasets: [{ data: verhuurde.map(o => Math.round(o.noi / 1000)), backgroundColor: '#6fa8ee', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => v + 'k' }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
   });
 
   const metLTV = ltvs.filter(o => o.ltv !== null);
   new Chart(document.getElementById('ltvChart'), {
     type: 'bar',
     data: { labels: metLTV.map(o => o.naam.split(' ')[0]), datasets: [{ data: metLTV.map(o => Math.round(o.ltv)), backgroundColor: metLTV.map(o => o.ltv > 70 ? '#F09595' : o.ltv > 60 ? '#FAC775' : '#97C459'), borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82' }, grid: { display: false } }, y: { min: 0, max: 90, ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, }, grid: { display: false } }, y: { min: 0, max: 90, ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
   });
 }
 
@@ -263,8 +298,8 @@ function buildTimeline() {
     { key: 'financiering', label: 'Financiering', color: '#B5D4F4', tc: '#0C447C' },
     { key: 'herfinanciering', label: 'Herfinanciering', color: '#5DCAA5', tc: '#085041' },
     { key: 'huur', label: 'Huur/exploitatie', color: '#97C459', tc: '#27500A' },
-    { key: 'bouw', label: 'Bouw', color: '#EF9F27', tc: '#412402' },
-    { key: 'equity_call', label: 'Equity call', color: '#E24B4A', tc: '#501313' },
+    { key: 'bouw', label: 'Bouw', color: '#e8b64a', tc: '#412402' },
+    { key: 'equity_call', label: 'Equity call', color: '#f0857a', tc: '#501313' },
     { key: 'acquisitie', label: 'Acquisitie', color: '#AFA9EC', tc: '#26215C' },
   ];
 
@@ -272,10 +307,10 @@ function buildTimeline() {
     `<span style="display:flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:2px;background:${t.color};display:inline-block"></span>${t.label}</span>`
   ).join('');
 
-  const startDate = new Date(D.meta.peildatum + '-01');
+  const [sj, sm] = E.parseDatum(D.meta.peildatum);
   function maandIndex(dateStr) {
-    const d = new Date(dateStr.substring(0, 7) + '-01');
-    return Math.round((d - startDate) / (1000 * 60 * 60 * 24 * 30));
+    const [j, m] = E.parseDatum(dateStr);
+    return (j - sj) * 12 + (m - sm);
   }
 
   const ganttRows = [
@@ -314,7 +349,7 @@ function buildTimeline() {
       const w = Math.max(b.d * CW - 1, 4);
       if (b.m < MONTHS) html += `<div class="g-bar" style="left:${left}px;width:${Math.min(w, (MONTHS - b.m) * CW)}px;background:${b.color};color:${b.tc}">${b.d > 2 ? b.label : ''}</div>`;
     });
-    html += `<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:#c0392b;z-index:5;pointer-events:none"></div>`;
+    html += `<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--red);z-index:5;pointer-events:none"></div>`;
     html += `</div></div>`;
   });
   html += '</div>';
@@ -328,12 +363,12 @@ function buildTimeline() {
   new Chart(document.getElementById('cashOverlayChart'), {
     type: 'bar',
     data: { labels: MND, datasets: [
-      { label: 'Inflows', data: inflows, backgroundColor: 'rgba(45,122,79,0.65)', borderRadius: 2 },
-      { label: 'Outflows', data: outflows, backgroundColor: 'rgba(192,57,43,0.65)', borderRadius: 2 },
-      { type: 'line', label: 'Kasverloop', data: kas, borderColor: '#1a5fa8', borderWidth: 2.5, fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
-      { type: 'line', label: 'Min. drempel', data: new Array(24).fill(D.meta.minimum_kas_drempel), borderColor: '#c0392b', borderWidth: 1, borderDash: [3, 3], fill: false, pointRadius: 0, yAxisID: 'y' },
+      { label: 'Inflows', data: inflows, backgroundColor: 'rgba(134,201,107,0.6)', borderRadius: 2 },
+      { label: 'Outflows', data: outflows, backgroundColor: 'rgba(240,133,122,0.6)', borderRadius: 2 },
+      { type: 'line', label: 'Kasverloop', data: kas, borderColor: '#6fa8ee', borderWidth: 2.5, fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+      { type: 'line', label: 'Min. drempel', data: new Array(24).fill(D.meta.minimum_kas_drempel), borderColor: '#f0857a', borderWidth: 1, borderDash: [3, 3], fill: false, pointRadius: 0, yAxisID: 'y' },
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 9 }, color: '#8a8a82', maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: { font: { size: 9 }, color: '#8a8a82', callback: v => E.fmt(v) }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 9 }, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: { font: { size: 9 }, callback: v => E.fmt(v) }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
   });
 
   document.getElementById('tl-kpis').innerHTML = [
@@ -446,22 +481,22 @@ function buildFinanciering() {
   const leningen = D.leningen;
   const totSch = E.totaleSculd();
   const gew = E.gewogenRente();
-  const nu = new Date();
+  const nu = E.peildatum();
   const eerstvolgend = leningen.filter(l => l.einddatum).sort((a, b) => new Date(a.einddatum) - new Date(b.einddatum))[0];
 
   document.getElementById('fin-sub').textContent = `${leningen.length} faciliteiten · ${E.fmt(totSch)} totaal · Gew. rente ${gew.toFixed(1)}%`;
   document.getElementById('fin-kpis').innerHTML = [
     kpi('Totale schuld', E.fmt(totSch), leningen.length + ' leningen', 'kv-red'),
     kpi('Gew. gem. rente', gew.toFixed(2) + '%', 'Gewogen op saldo'),
-    kpi('Eerstvolgende afloop', eerstvolgend?.einddatum || '—', eerstvolgend?.naam, 'kv-amber'),
+    kpi('Eerstvolgende afloop', E.fmtDatum(eerstvolgend?.einddatum), eerstvolgend?.naam, 'kv-amber'),
     kpi('LTV portefeuille', E.gewogenLTV().toFixed(0) + '%', 'Gewogen gem.'),
   ].join('');
 
   const rows = leningen.map(l => {
     const obj = D.objecten.find(o => o.id === l.object_id);
-    const maanden = l.einddatum ? (new Date(l.einddatum) - nu) / (1000 * 60 * 60 * 24 * 30) : 999;
-    const statusCls = maanden < 3 ? 'red' : maanden < 9 ? 'amber' : 'green';
-    const statusTxt = maanden < 3 ? 'Kritiek' : maanden < 9 ? 'Actie vereist' : 'Actief';
+    const maanden = l.einddatum ? E.maandenTot(l.einddatum) : 999;
+    const statusCls = maanden < 6 ? 'red' : maanden < 9 ? 'amber' : 'green';
+    const statusTxt = maanden < 6 ? 'Kritiek' : maanden < 9 ? 'Actie vereist' : 'Actief';
     const ltv = l.object_id ? E.ltvPerObject().find(o => o.id === l.object_id)?.ltv : null;
     const dscr = l.covenant_dscr_min ? (E.totalNOI() / (E.maandelijkseSchulddienst() * 12)).toFixed(2) : '—';
     return `<tr>
@@ -471,7 +506,7 @@ function buildFinanciering() {
       <td class="num">${E.fmt(l.huidig_saldo)}</td>
       <td class="num">${l.rente_pct}%</td>
       <td>${l.aflossing_type}</td>
-      <td class="${maanden < 9 ? (maanden < 3 ? 'red' : 'amber') : ''}" style="font-weight:${maanden < 9 ? 600 : 400}">${l.einddatum || '—'}</td>
+      <td class="${maanden < 9 ? (maanden < 6 ? 'red' : 'amber') : ''}" style="font-weight:${maanden < 9 ? 600 : 400}">${l.einddatum || '—'}</td>
       <td class="num ${ltv && ltv > (l.covenant_ltv_max || 100) * 0.9 ? 'amber' : ''}">${ltv ? ltv.toFixed(0) + '%' : '—'}</td>
       <td class="num">${dscr}</td>
       <td>${badge(statusTxt, statusCls)}</td>
@@ -492,8 +527,8 @@ function buildFinanciering() {
   const jaarLabels = Object.keys(jaren).sort();
   new Chart(document.getElementById('matChart'), {
     type: 'bar',
-    data: { labels: jaarLabels, datasets: [{ data: jaarLabels.map(j => Math.round(jaren[j] / 1e6 * 10) / 10), backgroundColor: jaarLabels.map(j => parseInt(j) <= new Date().getFullYear() + 1 ? '#F09595' : parseInt(j) <= new Date().getFullYear() + 2 ? '#FAC775' : '#B5D4F4'), borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y + 'M' } } }, scales: { x: { ticks: { font: { size: 11 }, color: '#8a8a82' }, grid: { display: false } }, y: { ticks: { font: { size: 11 }, color: '#8a8a82', callback: v => '€' + v + 'M' }, grid: { color: 'rgba(0,0,0,0.05)' } } } },
+    data: { labels: jaarLabels, datasets: [{ data: jaarLabels.map(j => Math.round(jaren[j] / 1e6 * 10) / 10), backgroundColor: jaarLabels.map(j => parseInt(j) <= nu.getFullYear() + 1 ? '#f0857a' : parseInt(j) <= nu.getFullYear() + 2 ? '#e8b64a' : '#6fa8ee'), borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y + 'M' } } }, scales: { x: { ticks: { font: { size: 11 }, }, grid: { display: false } }, y: { ticks: { font: { size: 11 }, callback: v => '€' + v + 'M' }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
   });
 
   // Tranches
@@ -531,11 +566,11 @@ function buildCovenant() {
     const ln = D.leningen.find(l => l.object_id === o.id);
     const max = ln?.covenant_ltv_max || 75;
     const pct = E.clamp(o.ltv / max * 100, 0, 100);
-    const color = o.ltv > max ? '#E24B4A' : o.ltv > max * 0.9 ? '#EF9F27' : '#639922';
+    const color = o.ltv > max ? '#f0857a' : o.ltv > max * 0.9 ? '#e8b64a' : '#86c96b';
     return { label: o.naam + ' LTV', val: pct, display: o.ltv.toFixed(0) + '% / max ' + max + '%', threshPct: 100, color };
   }),
-  { label: 'Portefeuille DSCR', val: E.clamp((dscr / 2) * 100, 0, 100), display: dscr.toFixed(2) + ' / min 1,20', threshPct: 60, color: dscr >= 1.4 ? '#639922' : dscr >= 1.2 ? '#EF9F27' : '#E24B4A' },
-  { label: 'ICR portefeuille', val: E.clamp((icr / 4) * 100, 0, 100), display: icr.toFixed(2) + ' / min 1,40', threshPct: 35, color: icr >= 2 ? '#639922' : '#EF9F27' },
+  { label: 'Portefeuille DSCR', val: E.clamp((dscr / 2) * 100, 0, 100), display: dscr.toFixed(2) + ' / min 1,20', threshPct: 60, color: dscr >= 1.4 ? '#86c96b' : dscr >= 1.2 ? '#e8b64a' : '#f0857a' },
+  { label: 'ICR portefeuille', val: E.clamp((icr / 4) * 100, 0, 100), display: icr.toFixed(2) + ' / min 1,40', threshPct: 35, color: icr >= 2 ? '#86c96b' : '#e8b64a' },
   ];
 
   document.getElementById('cov-bars').innerHTML = bars.map(b => `
@@ -578,6 +613,7 @@ const valParams = {
   prem_pct: D.waardering.platform_premium_pct,
 };
 let impC = null;
+const VAL_FMT = {};
 function buildValuation() {
   const sliders = [
     { id: 'v-noi', label: 'NOI (€/jaar)', min: E.totalNOI() * 0.5, max: E.totalNOI() * 1.8, step: 10000, key: 'noi', fmt: v => E.fmt(v, 1) },
@@ -588,8 +624,9 @@ function buildValuation() {
     { id: 'v-yield', label: 'Yield %', min: 4, max: 8, step: 0.25, key: 'yield_pct', fmt: v => v.toFixed(2) + '%' },
     { id: 'v-prem', label: 'Platform premium %', min: 0, max: 20, step: 1, key: 'prem_pct', fmt: v => v.toFixed(0) + '%' },
   ];
+  sliders.forEach(s => VAL_FMT[s.key] = s.fmt);
   const half = 4;
-  const renderS = arr => arr.map(s => `<div class="slider-row"><span class="slider-label">${s.label}</span><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${valParams[s.key]}" id="${s.id}" oninput="valParams['${s.key}']=parseFloat(this.value);document.getElementById('${s.id}-o').textContent=this.value;recalcVal()"><span class="slider-val" id="${s.id}-o">${s.fmt(valParams[s.key])}</span></div>`).join('');
+  const renderS = arr => arr.map(s => `<div class="slider-row"><span class="slider-label">${s.label}</span><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${valParams[s.key]}" id="${s.id}" oninput="valParams['${s.key}']=parseFloat(this.value);document.getElementById('${s.id}-o').textContent=VAL_FMT['${s.key}'](parseFloat(this.value));recalcVal()"><span class="slider-val" id="${s.id}-o">${s.fmt(valParams[s.key])}</span></div>`).join('');
   document.getElementById('val-sliders').innerHTML = `<div>${renderS(sliders.slice(0, half))}</div><div>${renderS(sliders.slice(half))}</div>`;
   recalcVal();
 }
@@ -614,10 +651,10 @@ function recalcVal() {
   const dRv = noi * 0.87 / ((yield_pct / 100) * 1.24);
   const dEq = dRv - debt + cash;
   document.getElementById('val-scenarios').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      <div style="background:var(--green-bg);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--green-text);margin-bottom:3px">Upside</div><div style="font-size:15px;font-weight:700;color:var(--green-text)">${E.fmt(uRv)}</div><div style="font-size:10px;color:var(--green-text)">Equity: ${E.fmt(uEq)}</div></div>
-      <div style="background:var(--blue-bg);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--blue-text);margin-bottom:3px">Base</div><div style="font-size:15px;font-weight:700;color:var(--blue-text)">${E.fmt(rv)}</div><div style="font-size:10px;color:var(--blue-text)">Equity: ${E.fmt(eq)}</div></div>
-      <div style="background:var(--red-bg);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--red-text);margin-bottom:3px">Downside</div><div style="font-size:15px;font-weight:700;color:var(--red-text)">${E.fmt(dRv)}</div><div style="font-size:10px;color:var(--red-text)">Equity: ${E.fmt(dEq)}</div></div>
+    <div class="val-scen-grid">
+      <div class="val-scen alert-green"><div class="l">Upside</div><div class="v">${E.fmt(uRv)}</div><div class="s">Equity: ${E.fmt(uEq)}</div></div>
+      <div class="val-scen alert-blue"><div class="l">Base</div><div class="v">${E.fmt(rv)}</div><div class="s">Equity: ${E.fmt(eq)}</div></div>
+      <div class="val-scen alert-red"><div class="l">Downside</div><div class="v">${E.fmt(dRv)}</div><div class="s">Equity: ${E.fmt(dEq)}</div></div>
     </div>`;
 
   const max = tv * 1.05;
@@ -626,7 +663,7 @@ function recalcVal() {
     { l: 'Min. schuld', v: -debt, c: '#F09595', tc: '#791F1F', tot: false },
     { l: 'Plus cash', v: cash, c: '#97C459', tc: '#27500A', tot: false },
     { l: 'Equity value', v: eq, c: '#378ADD', tc: '#042C53', tot: true },
-    { l: 'Platform prem.', v: prem, c: '#EF9F27', tc: '#412402', tot: false },
+    { l: 'Platform prem.', v: prem, c: '#e8b64a', tc: '#412402', tot: false },
     { l: 'Totale waarde', v: tv, c: '#534AB7', tc: '#26215C', tot: true },
   ];
   document.getElementById('val-bridge').innerHTML = steps.map(s => {
@@ -653,74 +690,97 @@ function recalcVal() {
   document.getElementById('val-sens').innerHTML = h + '</tbody>';
 
   const impacts = [
-    { l: 'Base', v: eq, c: '#1a5fa8' },
-    { l: 'Huur −15%', v: (noi * 0.85 / (yield_pct / 100)) - debt + cash, c: '#c0392b' },
-    { l: 'Yield +1,5%', v: (noi / ((yield_pct + 1.5) / 100)) - debt + cash, c: '#c0392b' },
-    { l: 'Rente +150bps', v: eq - debt * 0.015 / 0.07, c: '#f09595' },
-    { l: 'Bouw +6m delay', v: eq - noi * 0.4, c: '#fac775' },
-    { l: 'All-in worst', v: (noi * 0.8 / ((yield_pct + 2) / 100)) - debt * 1.05 + cash * 0.9, c: '#7a1f1a' },
+    { l: 'Base', v: eq, c: '#6fa8ee' },
+    { l: 'Huur −15%', v: (noi * 0.85 / (yield_pct / 100)) - debt + cash, c: '#f0857a' },
+    { l: 'Yield +1,5%', v: (noi / ((yield_pct + 1.5) / 100)) - debt + cash, c: '#f0857a' },
+    { l: 'Rente +150bps', v: eq - debt * 0.015 / 0.07, c: '#f6b2aa' },
+    { l: 'Bouw +6m delay', v: eq - noi * 0.4, c: '#e8b64a' },
+    { l: 'All-in worst', v: (noi * 0.8 / ((yield_pct + 2) / 100)) - debt * 1.05 + cash * 0.9, c: '#b84a40' },
   ];
   if (impC) impC.destroy();
   impC = new Chart(document.getElementById('impactChart'), {
     type: 'bar',
     data: { labels: impacts.map(s => s.l), datasets: [{ data: impacts.map(s => Math.round(s.v / 1e6 * 100) / 100), backgroundColor: impacts.map(s => s.c), borderRadius: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + Math.abs(ctx.parsed.x).toFixed(2) + 'M equity' } } }, scales: { x: { ticks: { font: { size: 10 }, color: '#8a8a82', callback: v => '€' + v + 'M' }, grid: { color: 'rgba(0,0,0,0.05)' } }, y: { ticks: { font: { size: 11 }, color: '#8a8a82' }, grid: { display: false } } } },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + Math.abs(ctx.parsed.x).toFixed(2) + 'M equity' } } }, scales: { x: { ticks: { font: { size: 10 }, callback: v => '€' + v + 'M' }, grid: { color: 'rgba(255,255,255,0.06)' } }, y: { ticks: { font: { size: 11 }, }, grid: { display: false } } } },
   });
 }
 
-// ---- OWNERSHIP ----
+// ---- GROEPSSTRUCTUUR ----
 function buildOwnership() {
   const SVG = document.getElementById('org-svg');
-  const BW = 100, BH = 38;
-  const nodes = [
-    ...D.eigenaren.map((e, i) => ({ id: e.id, x: i === 0 ? 20 : 270, y: 20, label: e.naam, sub: 'UBO · ' + e.participatie_pct + '%', fill: '#EEEDFE', stroke: '#AFA9EC', tc1: '#3C3489', tc2: '#534AB7' })),
-    ...D.eigenaren.map((e, i) => ({ id: e.id + '_h', x: i === 0 ? 20 : 270, y: 110, label: e.holding, sub: '100% ' + e.naam.split(' ')[0], fill: '#E1F5EE', stroke: '#5DCAA5', tc1: '#085041', tc2: '#0F6E56' })),
-    { id: 'fv', x: 150, y: 200, label: D.meta.bedrijfsnaam.split(' ').slice(0, 2).join(' '), sub: D.eigenaren.map(e => e.participatie_pct + '% ' + e.naam.split(' ')[0]).join(' · '), fill: '#FAECE7', stroke: '#D85A30', tc1: '#4A1B0C', tc2: '#712B13', wide: true },
-    ...D.objecten.filter(o => o.eigenaar_bv).reduce((acc, o) => {
-      const bv = o.eigenaar_bv;
-      if (!acc.find(n => n.label === bv)) acc.push({ id: 'bv_' + acc.length, x: 20 + acc.length * 120, y: 295, label: bv.split(' ')[0], sub: bv, fill: '#E6F1FB', stroke: '#378ADD', tc1: '#042C53', tc2: '#185FA5' });
-      return acc;
-    }, []),
-  ];
+  const VW = 420, BW = 100, BH = 40, FW = 170;
+  const kleur = {
+    ubo:     { fill: '#342c5a', stroke: '#8a7ee0', tc1: '#e1dcff', tc2: '#b4aaf0' },
+    holding: { fill: '#1f4034', stroke: '#4fb28c', tc1: '#cdeee0', tc2: '#8fd4b8' },
+    top:     { fill: '#4d2a1e', stroke: '#d27a55', tc1: '#fbdccf', tc2: '#eeae93' },
+    bv:      { fill: '#1f3553', stroke: '#5b8fd9', tc1: '#d6e6fb', tc2: '#9fc2ef' },
+  };
+  const n = D.eigenaren.length;
+  const kolomX = i => (VW / n) * (i + 0.5) - BW / 2;
+  const bvs = [...new Set(D.objecten.filter(o => o.eigenaar_bv).map(o => o.eigenaar_bv))]
+    .filter(bv => bv !== D.meta.bedrijfsnaam);
+  const bvW = Math.min(BW, (VW - 10 * (bvs.length + 1)) / Math.max(bvs.length, 1));
+  const bvGap = (VW - bvs.length * bvW) / (bvs.length + 1);
 
-  let svg = nodes.map(n => {
-    const w = n.wide ? 160 : BW;
-    const cx = n.x + w / 2;
-    return `<g class="ent-box" onclick="showEnt('${n.id}')">
-      <rect x="${n.x}" y="${n.y}" width="${w}" height="${BH}" rx="7" fill="${n.fill}" stroke="${n.stroke}" stroke-width="0.7"/>
-      <text x="${cx}" y="${n.y + 14}" text-anchor="middle" font-size="11" font-weight="600" fill="${n.tc1}" font-family="DM Sans,sans-serif">${n.label}</text>
-      <text x="${cx}" y="${n.y + 27}" text-anchor="middle" font-size="9.5" fill="${n.tc2}" font-family="DM Sans,sans-serif">${n.sub}</text>
+  const nodes = [
+    ...D.eigenaren.map((e, i) => ({ id: e.id, x: kolomX(i), y: 20, w: BW, label: e.naam, sub: 'UBO · ' + e.participatie_pct + '%', ...kleur.ubo })),
+    ...D.eigenaren.map((e, i) => ({ id: e.id + '_h', x: kolomX(i), y: 110, w: BW, label: e.holding, sub: '100% ' + e.naam.split(' ')[0], ...kleur.holding })),
+    { id: 'fv', x: (VW - FW) / 2, y: 200, w: FW, label: D.meta.bedrijfsnaam, sub: D.eigenaren.map(e => e.participatie_pct + '% ' + e.naam.split(' ')[0]).join(' · '), ...kleur.top },
+    ...bvs.map((bv, i) => ({ id: 'bv_' + i, bv, x: bvGap + i * (bvW + bvGap), y: 290, w: bvW, label: bv.replace(/ BV$/, ''), sub: D.objecten.filter(o => o.eigenaar_bv === bv).map(o => o.stad).join(', '), ...kleur.bv })),
+  ];
+  const byId = id => nodes.find(x => x.id === id);
+  const lijn = (a, b, label) => {
+    const x1 = a.x + a.w / 2, y1 = a.y + BH, x2 = b.x + b.w / 2, y2 = b.y;
+    let out = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2 - 2}" stroke="#8e8e8e" stroke-width="1.1" marker-end="url(#arr)"/>`;
+    if (label) out += `<text x="${(x1 + x2) / 2 + 6}" y="${(y1 + y2) / 2 + 3}" font-size="9.5" fill="#c4c4c4" font-family="DM Sans,sans-serif">${label}</text>`;
+    return out;
+  };
+
+  let svg = '';
+  D.eigenaren.forEach(e => {
+    svg += lijn(byId(e.id), byId(e.id + '_h'), '100%');
+    svg += lijn(byId(e.id + '_h'), byId('fv'), e.participatie_pct + '%');
+  });
+  nodes.filter(x => x.bv).forEach(x => svg += lijn(byId('fv'), x, ''));
+
+  svg += nodes.map(x => {
+    const cx = x.x + x.w / 2;
+    return `<g class="ent-box" onclick="showEnt('${x.id}')">
+      <rect x="${x.x}" y="${x.y}" width="${x.w}" height="${BH}" rx="7" fill="${x.fill}" stroke="${x.stroke}" stroke-width="0.8"/>
+      <text x="${cx}" y="${x.y + 16}" text-anchor="middle" font-size="10.5" font-weight="600" fill="${x.tc1}" font-family="DM Sans,sans-serif">${x.label}</text>
+      <text x="${cx}" y="${x.y + 29}" text-anchor="middle" font-size="9" fill="${x.tc2}" font-family="DM Sans,sans-serif">${x.sub}</text>
     </g>`;
   }).join('');
 
-  // Arrows
-  D.eigenaren.forEach((e, i) => {
-    const from = nodes.find(n => n.id === e.id);
-    const to = nodes.find(n => n.id === e.id + '_h');
-    if (from && to) svg += `<line x1="${from.x + BW / 2}" y1="${from.y + BH}" x2="${to.x + BW / 2}" y2="${to.y}" stroke="#888780" stroke-width="1.2" marker-end="url(#arr)"/>`;
-  });
-  D.eigenaren.forEach(e => {
-    const from = nodes.find(n => n.id === e.id + '_h');
-    const fv = nodes.find(n => n.id === 'fv');
-    if (from && fv) {
-      svg += `<line x1="${from.x + BW / 2}" y1="${from.y + BH}" x2="${fv.x + 80}" y2="${fv.y}" stroke="#888780" stroke-width="1.2" marker-end="url(#arr)"/>`;
-      svg += `<text x="${(from.x + BW / 2 + fv.x + 80) / 2}" y="${(from.y + BH + fv.y) / 2}" text-anchor="middle" font-size="9" fill="#5a5a54" font-family="DM Sans,sans-serif">${e.participatie_pct}%</text>`;
-    }
-  });
-
   SVG.innerHTML = SVG.innerHTML + svg;
 
-  // Look-through table
+  nodes.filter(x => x.bv).forEach(x => {
+    const kas = D.kasstand.find(k => k.entiteit === x.bv);
+    const objs = D.objecten.filter(o => o.eigenaar_bv === x.bv);
+    entData[x.id] = {
+      naam: x.bv, Type: 'Object-BV', Eigenaar: '100% ' + D.meta.bedrijfsnaam,
+      Objecten: objs.map(o => o.naam).join(', '),
+      Marktwaarde: E.fmt(objs.reduce((s, o) => s + (o.marktwaarde || 0), 0)),
+      Kas: E.fmt(kas ? kas.saldo : 0),
+    };
+  });
+}
+
+// ---- LOOK-THROUGH (pagina Eigenaren) ----
+function buildLookThrough() {
   const lt = E.navPerEigenaar();
+  const irr = E.portefeuilleIRR();
   document.getElementById('lt-tbl').innerHTML = `
-    <thead><tr><th>Eigenaar</th><th>Participatie</th><th>Kapitaal ingebracht</th><th>NAV-aandeel</th><th>Equity-aandeel</th><th>IRR (schatting)</th></tr></thead>
+    <thead><tr><th>Eigenaar</th><th>Holding</th><th>Participatie</th><th>Kapitaal ingebracht</th><th>ASL gegeven</th><th>NAV-aandeel</th><th>Equity-aandeel</th><th>IRR (portefeuille)</th></tr></thead>
     <tbody>${lt.map(e => `<tr>
       <td style="font-weight:600">${e.naam}</td>
+      <td>${e.holding}</td>
       <td class="num">${e.participatie_pct}%</td>
       <td class="num">${E.fmt(e.kapitaal_ingebracht)}</td>
+      <td class="num">${e.asl_gegeven ? E.fmt(e.asl_gegeven) + ' @ ' + e.asl_rente_pct + '%' : '—'}</td>
       <td class="num green">${E.fmt(e.nav_aandeel)}</td>
       <td class="num green">${E.fmt(e.equity_aandeel)}</td>
-      <td class="num green">~${(10 + e.participatie_pct * 0.02).toFixed(1)}%</td>
+      <td class="num green">${irr === null ? '—' : irr.toFixed(1) + '%'}</td>
     </tr>`).join('')}</tbody>`;
 }
 

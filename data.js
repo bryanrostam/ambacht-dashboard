@@ -28,7 +28,8 @@ window.FORTIS_DATA = {
     bedrijfsnaam: "Fortis Vastgoed BV",
     subtitel: "Portfolio Dashboard",
     versie: "v1.0",
-    peildatum: "2024-04-01",   // datum waarop kasstand is gemeten
+    peildatum: "2026-04-01",   // datum waarop kasstand is gemeten
+    kasaldo_vorige_maand: 4996000, // totale kas vorige maand (voor "▲ vs vorige maand" op Management)
     minimum_kas_drempel: 500000, // alert als kasaldo hieronder komt
   },
 
@@ -86,6 +87,7 @@ window.FORTIS_DATA = {
       aankoopprijs: 4200000,
       marktwaarde: 5400000,
       bvo_m2: 620,
+      irr_pct: 10.8,             // verwacht rendement (IRR) in %
       // Huurcontracten voor dit object: zie huurcontracten[] hieronder
     },
     {
@@ -98,6 +100,7 @@ window.FORTIS_DATA = {
       aankoopprijs: 4800000,
       marktwaarde: 6100000,
       bvo_m2: 740,
+      irr_pct: 9.6,             // verwacht rendement (IRR) in %
     },
     {
       id: "lei01",
@@ -109,6 +112,7 @@ window.FORTIS_DATA = {
       aankoopprijs: 2100000,
       marktwaarde: 2800000,
       bvo_m2: 280,
+      irr_pct: 11.2,             // verwacht rendement (IRR) in %
     },
     {
       id: "gro01",
@@ -121,6 +125,7 @@ window.FORTIS_DATA = {
       marktwaarde: 3200000,
       verwachte_verkoopprijs: 3350000,
       bvo_m2: 310,
+      irr_pct: 8.9,             // verwacht rendement (IRR) in %
     },
     {
       id: "ehv01",
@@ -132,6 +137,7 @@ window.FORTIS_DATA = {
       aankoopprijs: 3500000,
       marktwaarde: 9800000,     // GDV (Gross Development Value)
       bvo_m2: 1840,
+      irr_pct: 14.5,             // verwacht rendement (IRR) in %
       verwachte_opleveringsdatum: "2027-09-01",
     },
     {
@@ -156,6 +162,7 @@ window.FORTIS_DATA = {
       aankoopprijs: 1400000,
       marktwaarde: 1800000,
       bvo_m2: 165,
+      irr_pct: 9.8,             // verwacht rendement (IRR) in %
     },
   ],
 
@@ -336,12 +343,12 @@ window.FORTIS_DATA = {
   //  status: "getrokken" | "goedgekeurd" | "gepland" | "toekomstig"
   // ----------------------------------------------------------
   bouw_tranches: [
-    { id: "tr01", lening_id: "ln05", nr: 1, bedrag: 1800000, datum: "2024-01-15", voorwaarde: "Grondoverdracht",   status: "getrokken" },
-    { id: "tr02", lening_id: "ln05", nr: 2, bedrag: 1900000, datum: "2024-03-01", voorwaarde: "Fundering gereed", status: "getrokken" },
-    { id: "tr03", lening_id: "ln05", nr: 3, bedrag: 1400000, datum: "2024-04-15", voorwaarde: "Ruwbouw 30%",      status: "getrokken" },
-    { id: "tr04", lening_id: "ln05", nr: 4, bedrag: 1600000, datum: "2024-08-01", voorwaarde: "Ruwbouw 70%",      status: "gepland" },   // LET OP
-    { id: "tr05", lening_id: "ln05", nr: 5, bedrag: 950000,  datum: "2024-11-01", voorwaarde: "Afbouw gereed",    status: "toekomstig" },
-    { id: "tr06", lening_id: "ln05", nr: 6, bedrag: 850000,  datum: "2025-03-01", voorwaarde: "Oplevering",       status: "toekomstig" },
+    { id: "tr01", lening_id: "ln05", nr: 1, bedrag: 1800000, datum: "2026-01-15", voorwaarde: "Grondoverdracht",   status: "getrokken" },
+    { id: "tr02", lening_id: "ln05", nr: 2, bedrag: 1900000, datum: "2026-03-01", voorwaarde: "Fundering gereed", status: "getrokken" },
+    { id: "tr03", lening_id: "ln05", nr: 3, bedrag: 1400000, datum: "2026-04-15", voorwaarde: "Ruwbouw 30%",      status: "getrokken" },
+    { id: "tr04", lening_id: "ln05", nr: 4, bedrag: 1600000, datum: "2026-08-01", voorwaarde: "Ruwbouw 70%",      status: "gepland" },   // LET OP
+    { id: "tr05", lening_id: "ln05", nr: 5, bedrag: 950000,  datum: "2026-11-01", voorwaarde: "Afbouw gereed",    status: "toekomstig" },
+    { id: "tr06", lening_id: "ln05", nr: 6, bedrag: 850000,  datum: "2027-03-01", voorwaarde: "Oplevering",       status: "toekomstig" },
   ],
 
   // ----------------------------------------------------------
@@ -355,7 +362,7 @@ window.FORTIS_DATA = {
       type: "herfinanciering",
       naam: "Herfi Leiden — netto opbrengst",
       object_id: "lei01",
-      verwachte_datum: "2024-06-01",
+      verwachte_datum: "2026-06-01",
       bedrag: 920000,              // positief = inkomst voor de groep
       zekerheid: "expected",
       kans_pct: 90,
@@ -367,7 +374,7 @@ window.FORTIS_DATA = {
       type: "bouwtranche",
       naam: "EHV Tranche 4 — opname",
       object_id: "ehv01",
-      verwachte_datum: "2024-08-01",
+      verwachte_datum: "2026-08-01",
       bedrag: 1600000,             // inkomst (opname financiering)
       zekerheid: "expected",
       kans_pct: 75,
@@ -379,7 +386,7 @@ window.FORTIS_DATA = {
       type: "equity_call",
       naam: "Equity call — aankoop Den Haag",
       object_id: "dh01",
-      verwachte_datum: "2024-09-01",
+      verwachte_datum: "2026-09-01",
       bedrag: -1200000,            // negatief = uitgave
       zekerheid: "expected",
       kans_pct: 80,
@@ -391,7 +398,7 @@ window.FORTIS_DATA = {
       type: "herfinanciering",
       naam: "Herfi Rotterdam — netto opbrengst",
       object_id: "rtt01",
-      verwachte_datum: "2024-11-01",
+      verwachte_datum: "2026-11-01",
       bedrag: 400000,
       zekerheid: "expected",
       kans_pct: 85,
@@ -403,7 +410,7 @@ window.FORTIS_DATA = {
       type: "verkoop",
       naam: "Verkoop Groningen",
       object_id: "gro01",
-      verwachte_datum: "2025-02-01",
+      verwachte_datum: "2027-02-01",
       bedrag: 1850000,             // netto na aflossing hypotheek en kosten
       zekerheid: "oriëntatie",
       kans_pct: 45,
@@ -415,7 +422,7 @@ window.FORTIS_DATA = {
       type: "equity_call",
       naam: "Herfi kosten Rotterdam",
       object_id: "rtt01",
-      verwachte_datum: "2024-11-01",
+      verwachte_datum: "2026-11-01",
       bedrag: -180000,
       zekerheid: "expected",
       kans_pct: 90,

@@ -6,16 +6,35 @@
 ## BESTANDEN
 
 ```
-fortis-dashboard/
-├── index.html          ← Open dit in je browser
-├── css/
-│   └── style.css       ← Huisstijl (kleuren, fonts)
-├── js/
-│   ├── data.js         ← ✏️ DIT IS HET ENIGE BESTAND DAT JIJ AANPAST
-│   ├── engine.js       ← Alle berekeningen (niet aanpassen)
-│   └── dashboard.js    ← Alle views (niet aanpassen)
-└── README.md           ← Dit bestand
+ambacht-dashboard/
+├── index.html      ← Open dit in je browser
+├── style.css       ← Huisstijl (donker thema, kleuren, fonts)
+├── data.js         ← ✏️ DIT IS HET ENIGE BESTAND DAT JIJ AANPAST
+├── engine.js       ← Alle berekeningen (niet aanpassen)
+├── dashboard.js    ← Alle views (niet aanpassen)
+└── README.md       ← Dit bestand
 ```
+
+### Navigatie
+
+| Menu | Inhoud |
+|---|---|
+| Management | KPI's, actieve meldingen, kasverloop 24 maanden, pipeline |
+| Liquiditeit | Cashflow forecast, tabel 12 maanden, cash per entiteit |
+| Portefeuille | Objecten, NOI/LTV, planning & timeline, scenario's & stress testing |
+| Financiering | Leningen, maturity, bouwtranches, covenant monitoring |
+| Waardering | Waardering, value bridge, sensitivity, exit readiness & risico |
+| Groepsstructuur | Organogram (klik op een entiteit voor details) |
+| Eigenaren | Look-through belang per eigenaar, equity calls |
+
+### Velden voor het Management-scherm
+
+| Veld | Waar in data.js | Effect |
+|---|---|---|
+| `meta.bedrijfsnaam` / `meta.subtitel` | `meta` | Naam en ondertitel linksboven |
+| `meta.peildatum` | `meta` | Maand in de subtitel en startpunt van de forecast |
+| `meta.kasaldo_vorige_maand` | `meta` | "▲ +€124k vs mrt" onder Kasaldo vandaag (optioneel) |
+| `objecten[].irr_pct` | `objecten` | Portefeuille IRR (gewogen op marktwaarde) |
 
 ---
 
