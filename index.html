@@ -164,6 +164,7 @@
 
     <!-- ---- CREDITEUREN ---- -->
     <section class="page" id="page-crediteuren">
+      <div id="cred-overzicht">
       <div class="page-title">Crediteuren</div>
       <div class="page-sub" id="cred-sub">Laden...</div>
       <div class="kg g4" id="cred-kpis"></div>
@@ -196,6 +197,8 @@
         <div class="card-title">Betaalplanning komende 12 weken</div>
         <div class="chart-box" style="height:220px"><canvas id="credChart"></canvas></div>
       </div>
+      </div>
+      <div id="cred-dossier" hidden></div>
     </section>
 
     <!-- ---- PORTEFEUILLE (incl. timeline & scenario's) ---- -->
@@ -388,6 +391,7 @@
 <script src="dashboard.js"></script>
 <script src="docs.js"></script>
 <script src="objecten.js"></script>
+<script src="crediteur-dossier.js"></script>
 <script src="editor.js"></script>
 <script src="account.js"></script>
 

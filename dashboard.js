@@ -54,7 +54,8 @@ const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g,
 const badge = (txt, cls) => `<span class="badge badge-${cls}">${txt}</span>`;
 const kpi = (label, val, sub, colorCls = '') =>
   `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value ${colorCls}">${val}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
-const alertEl = (level, txt) => {
+const betaalKnop = id => `<button type="button" class="btn btn-small alert-knop" onclick="event.stopPropagation(); openDossier('${esc(id)}')">Betalen</button>`;
+const alertEl = (level, txt, actie = '') => {
   const map = {
     kritiek:  ['alert-red', 'dot-red', 'Kritiek'],
     aandacht: ['alert-amber', 'dot-amber', 'Aandacht'],
@@ -62,7 +63,7 @@ const alertEl = (level, txt) => {
     ok:       ['alert-green', 'dot-green', 'OK'],
   };
   const [ac, dc, label] = map[level] || map.info;
-  return `<div class="alert ${ac}"><div class="alert-dot ${dc}"></div><div><strong>${label}</strong> — ${txt}</div></div>`;
+  return `<div class="alert ${ac}${actie ? ' alert-met-knop' : ''}"><div class="alert-dot ${dc}"></div><div class="alert-tekst"><strong>${label}</strong> — ${txt}</div>${actie}</div>`;
 };
 const statusBadge = s => {
   const m = { eigendom: 'green', herfi: 'blue', bouw: 'amber', acquisitie: 'purple', verkoop: 'red', lopend: 'blue' };
@@ -123,7 +124,7 @@ let exC = null;
 
   // Alerts
   document.getElementById('exec-alerts').innerHTML = (alerts.length
-    ? alerts.map(a => alertEl(a.niveau, a.tekst))
+    ? alerts.map(a => alertEl(a.niveau, a.tekst, a.bron === 'crediteur' ? betaalKnop(a.id) : ''))
     : [alertEl('ok', 'Geen kritieke meldingen op dit moment.')]
   ).join('');
 
@@ -936,7 +937,7 @@ function buildCrediteuren() {
     ? urgent.map(c => alertEl(c.urgentie.niveau,
       `<strong>${esc(c.naam)}</strong> · ${E.fmt(c.te_betalen)} vóór ${E.fmtDatum(c.deadline)} (${E.dagenTekst(c.urgentie.dagen)})` +
       ` · ${E.CRED_STATUS[c.status].label}${c.schuifruimte === 'nee' ? ' · niet schuifbaar' : c.schuifruimte === 'beperkt' ? ` · max ${c.max_uitstel_dagen || 7} dagen uitstel` : ` · uitstel tot ${c.max_uitstel_dagen || 30} dagen mogelijk`}` +
-      (c.notitie ? `<br><span style="opacity:.85">${esc(c.notitie)}</span>` : ''))).join('')
+      (c.notitie ? `<br><span style="opacity:.85">${esc(c.notitie)}</span>` : ''), betaalKnop(c.id))).join('')
     : alertEl('ok', 'Geen betalingen die binnen 14 dagen actie vereisen.');
 
   // Filters
@@ -947,7 +948,7 @@ function buildCrediteuren() {
   // Betaalregelingen
   document.getElementById('cred-regelingen').innerHTML = regelingen.length ? `
     <thead><tr><th>Partij</th><th>Termijn</th><th>Volgende</th><th>Termijnen</th><th>Restschuld</th></tr></thead>
-    <tbody>${regelingen.map(c => `<tr class="klikbaar" onclick="EDITOR.editCrediteur('${esc(c.id)}')">
+    <tbody>${regelingen.map(c => `<tr class="klikbaar" onclick="openDossier('${esc(c.id)}')">
       <td class="cred-naam">${esc(c.naam)}</td>
       <td class="num">${E.fmt(c.termijn_bedrag)}/mnd</td>
       <td class="${c.urgentie.niveau === 'kritiek' ? 'red' : c.urgentie.niveau === 'aandacht' ? 'amber' : ''} td-nowrap">${E.fmtDatum(c.volgende_termijn)}<br><span class="cred-dagen">${E.dagenTekst(c.urgentie.dagen)}</span></td>
@@ -1016,7 +1017,7 @@ function buildCredTabel(lijst) {
     <tbody>${rijen.length ? rijen.map(c => {
       const u = c.urgentie;
       const kl = u.niveau === 'kritiek' ? 'red' : u.niveau === 'aandacht' ? 'amber' : '';
-      return `<tr class="klikbaar urg-${u.niveau}" onclick="EDITOR.editCrediteur('${esc(c.id)}')">
+      return `<tr class="klikbaar urg-${u.niveau}" onclick="openDossier('${esc(c.id)}')">
         <td><div class="cred-naam">${esc(c.naam)}</div><div class="cred-oms">${esc(c.omschrijving || c.categorie || '')}</div></td>
         <td>${badge(E.CRED_STATUS[c.status]?.label || c.status, CRED_BADGE[c.status] || 'gray')}</td>
         <td class="num">${E.fmt(c.bedrag_open)}</td>
@@ -1025,7 +1026,7 @@ function buildCredTabel(lijst) {
         <td><span class="prio prio-${c.prioriteit || 2}">${prioTxt[c.prioriteit || 2]}</span></td>
         <td>${c.schuifruimte === 'ja' ? badge('Ja · ' + (c.max_uitstel_dagen || 30) + 'd', 'green') : c.schuifruimte === 'beperkt' ? badge('Beperkt · ' + (c.max_uitstel_dagen || 7) + 'd', 'amber') : badge('Nee', 'red')}</td>
         <td class="cred-oms">${esc(c.entiteit || '—')}</td>
-        <td class="row-actions"><button type="button" class="icon-btn" title="Wijzigen" aria-label="Wijzigen">✎</button></td>
+        <td class="row-actions"><span class="rij-pijl" aria-hidden="true">›</span></td>
       </tr>`;
     }).join('') : '<tr><td colspan="9" style="color:var(--text-3)">Geen crediteuren in deze selectie.</td></tr>'}</tbody>`;
 }

@@ -420,13 +420,21 @@
     };
     status.addEventListener('change', toggle);
     toggle();
+    // Openstaand bedrag komt uit de facturen als die er zijn
+    if (c.facturen && c.facturen.length) {
+      const b = form.elements.bedrag_open;
+      b.readOnly = true;
+      b.closest('.f-veld').insertAdjacentHTML('beforeend', '<small>Berekend uit de facturen in het dossier</small>');
+    }
   }
 
   function deleteCrediteur(id) {
     const c = (D.crediteuren || []).find(x => x.id === id);
     if (!c || !confirm(`Crediteur "${c.naam}" verwijderen?\nTip: zet de status op "Betaald" als je de historie wilt bewaren.`)) return false;
     D.crediteuren = D.crediteuren.filter(x => x.id !== id);
-    opslaanEnHerladen();
+    try { sessionStorage.removeItem('dossier_open'); } catch (e) { /* niets */ }
+    if (window.DOCS) DOCS.verwijderVoorObject('cred:' + id).catch(() => {}).finally(opslaanEnHerladen);
+    else opslaanEnHerladen();
     return true;
   }
 

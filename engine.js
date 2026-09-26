@@ -236,9 +236,32 @@ window.ENGINE = (function () {
   function credDeadline(c) {
     return c.status === 'betaalregeling' && c.volgende_termijn ? c.volgende_termijn : c.vervaldatum;
   }
+  // Het bedrag dat als eerste betaald moet worden
   function credTeBetalen(c) {
-    if (c.status === 'betaalregeling' && c.termijn_bedrag) return Math.min(c.termijn_bedrag, c.bedrag_open || c.termijn_bedrag);
-    return c.bedrag_open || 0;
+    return credEersteBetaling(c).bedrag;
+  }
+  function credEersteBetaling(c) {
+    const open = c.bedrag_open || 0;
+    const facturen = (c.facturen || []).filter(f => (f.open || 0) > 0);
+    if (c.status === 'betaald' || open <= 0) return { bedrag: 0, reden: 'Niets openstaand', facturen: [] };
+    if (c.status === 'betaalregeling' && c.termijn_bedrag) {
+      return { bedrag: Math.min(c.termijn_bedrag, open), reden: 'Volgende termijn van de betaalregeling', facturen };
+    }
+    if (c.status === 'faillissement') return { bedrag: open, reden: 'Volledig bedrag om de faillissementsaanvraag te voorkomen', facturen };
+    if (c.status === 'incasso') return { bedrag: open, reden: 'Volledig bedrag inclusief incassokosten om het incassotraject te stoppen', facturen };
+    if (facturen.length) {
+      // Alle facturen die op of vóór de deadline vervallen (minstens de oudste)
+      const deadline = c.vervaldatum || '9999-12-31';
+      const gesorteerd = facturen.slice().sort((a, b) => (a.vervaldatum || '').localeCompare(b.vervaldatum || ''));
+      let teBetalen = gesorteerd.filter(f => !f.vervaldatum || f.vervaldatum <= deadline);
+      if (!teBetalen.length) teBetalen = [gesorteerd[0]];
+      return {
+        bedrag: teBetalen.reduce((s, f) => s + f.open, 0),
+        reden: teBetalen.length === facturen.length ? 'Alle openstaande facturen' : `${teBetalen.length} van ${facturen.length} facturen vervallen vóór de deadline`,
+        facturen: teBetalen,
+      };
+    }
+    return { bedrag: open, reden: 'Openstaand bedrag', facturen: [] };
   }
   // niveau: 'kritiek' (nu betalen) | 'aandacht' | 'ok' | 'betaald'
   function credUrgentie(c) {
@@ -368,6 +391,7 @@ window.ENGINE = (function () {
         niveau: c.urgentie.niveau,
         tekst: `Crediteur ${c.naam}: ${fmt(c.te_betalen)} betalen vóór ${fmtDatum(c.deadline)} (${dagenTekst(c.urgentie.dagen)}).${st}`,
         bron: 'crediteur',
+        id: c.id,
       });
     });
 
@@ -474,7 +498,7 @@ window.ENGINE = (function () {
     fmt, pct, clamp,
     parseDatum, peildatum, fmtDatum, maandJaarLang, maandenTot, offsetMaand,
     portefeuilleIRR,
-    CRED_STATUS, crediteuren, crediteurenGesorteerd, credUrgentie, credDeadline, credTeBetalen,
+    CRED_STATUS, crediteuren, crediteurenGesorteerd, credUrgentie, credDeadline, credTeBetalen, credEersteBetaling,
     crediteurenPerMaand, dagenTot, dagenTekst, vandaag,
     totaleKas, beschikbareKas, kasPerEntiteit,
     jaarlijkseHuur, maandelijkseHuur,

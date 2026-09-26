@@ -245,7 +245,7 @@ function renderDocs(o) {
 
 function wijzigDocument(d, o) {
   const body = `<div class="f-grid f-grid-2" style="margin-top:14px">
-    <label class="f-veld"><span>Soort document</span><select name="soort">${DOCS.SOORTEN.map(s => `<option value="${s.key}"${s.key === d.soort ? ' selected' : ''}>${s.label}</option>`).join('')}</select></label>
+    <label class="f-veld"><span>Soort document</span><select name="soort">${DOCS.SOORTEN.filter(s => (s.groep || 'object') === (o.groep || 'object') || s.key === 'overig').map(s => `<option value="${s.key}"${s.key === d.soort ? ' selected' : ''}>${s.label}</option>`).join('')}</select></label>
     <label class="f-veld"><span>Documentdatum</span><input type="date" name="documentdatum" value="${esc(d.documentdatum || '')}"></label>
     <label class="f-veld f-breed"><span>Bestandsnaam</span><input name="naam" value="${esc(d.naam)}" required></label>
     <label class="f-veld f-breed"><span>Notitie</span><input name="notitie" value="${esc(d.notitie || '')}" placeholder="Bijv. taxateur, waarde, bijzonderheden"></label>

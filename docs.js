@@ -22,7 +22,30 @@ window.DOCS = (function () {
     { key: 'vergunning', label: 'Bouwtekening / vergunning', check: o => o.status === 'bouw' },
     { key: 'onderhoud', label: 'Onderhoudsrapport (MJOP)', check: () => false },
     { key: 'overig', label: 'Overig', check: () => false },
+    // Crediteurdossiers
+    { key: 'factuur', label: 'Factuur', groep: 'crediteur', check: () => false },
+    { key: 'aanmaning', label: 'Aanmaning / herinnering', groep: 'crediteur', check: () => false },
+    { key: 'sommatie', label: 'Sommatie / incasso', groep: 'crediteur', check: () => false },
+    { key: 'faillissement_brief', label: 'Faillissementsdreiging', groep: 'crediteur', check: () => false },
+    { key: 'regeling', label: 'Betaalregeling', groep: 'crediteur', check: () => false },
+    { key: 'betaalbewijs', label: 'Betaalbewijs', groep: 'crediteur', check: () => false },
+    { key: 'correspondentie', label: 'Correspondentie', groep: 'crediteur', check: () => false },
   ];
+
+  function raadCrediteurSoort(naam) {
+    const n = naam.toLowerCase();
+    const regels = [
+      [/faillis/, 'faillissement_brief'],
+      [/sommatie|incasso|deurwaarder|dagvaard/, 'sommatie'],
+      [/aanmaning|herinnering|reminder/, 'aanmaning'],
+      [/regeling|termijn/, 'regeling'],
+      [/betaalbewijs|bevestiging|afschrift|receipt/, 'betaalbewijs'],
+      [/factuur|invoice|nota|aanslag|fact/, 'factuur'],
+      [/mail|brief|correspond/, 'correspondentie'],
+    ];
+    const r = regels.find(([re]) => re.test(n));
+    return r ? r[1] : 'factuur';
+  }
 
   // Soort raden aan de bestandsnaam
   function raadSoort(naam) {
@@ -141,5 +164,5 @@ window.DOCS = (function () {
     return b + ' B';
   }
 
-  return { SOORTEN, raadSoort, alleMeta, lijst, voegToe, wijzig, verwijder, verwijderVoorObject, openen, downloaden, fmtGrootte, MAX_BESTAND };
+  return { SOORTEN, raadSoort, raadCrediteurSoort, alleMeta, lijst, voegToe, wijzig, verwijder, verwijderVoorObject, openen, downloaden, fmtGrootte, MAX_BESTAND };
 })();

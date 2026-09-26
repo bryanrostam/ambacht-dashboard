@@ -439,6 +439,10 @@ window.FORTIS_DATA = {
   //  vervaldatum:  uiterste betaaldatum (deadline)
   //  Bij een betaalregeling: termijn_bedrag, volgende_termijn, termijnen_resterend
   //  Deadlines worden vergeleken met de datum van VANDAAG.
+  //  facturen[]:   per factuur nummer, datum, vervaldatum, bedrag, open, bv (entiteit op de factuur)
+  //  betalingen[]: geregistreerde betalingen (datum, bedrag, bv, factuur_id)
+  //  iban / tnv / betaalkenmerk: betaalgegevens
+  //  bedrag_open = som van de openstaande facturen (wordt automatisch bijgewerkt)
   // ----------------------------------------------------------
   crediteuren: [
     {
@@ -447,6 +451,13 @@ window.FORTIS_DATA = {
       status: "faillissement", vervaldatum: "2026-09-30", prioriteit: 1,
       schuifruimte: "nee", max_uitstel_dagen: 0,
       contact: "mr. De Groot (advocaat)", entiteit: "EHV Dev BV",
+      iban: "NL02 RABO 0123 4567 89", tnv: "Installatietechniek Brabant BV", betaalkenmerk: "Dossier 2026-118",
+      facturen: [
+        { id: "f0101", nummer: "F-2026-0412", datum: "2026-05-15", vervaldatum: "2026-06-14", bedrag: 38500, open: 38500, bv: "EHV Dev BV", omschrijving: "Installaties fase 1" },
+        { id: "f0102", nummer: "F-2026-0488", datum: "2026-06-20", vervaldatum: "2026-07-20", bedrag: 21300, open: 21300, bv: "EHV Dev BV", omschrijving: "Installaties fase 2" },
+        { id: "f0103", nummer: "INC-2026-118", datum: "2026-09-10", vervaldatum: "2026-09-30", bedrag: 2500, open: 2500, bv: "EHV Dev BV", omschrijving: "Buitengerechtelijke incassokosten" },
+      ],
+      betalingen: [],
       notitie: "Advocaat heeft faillissementsaanvraag aangekondigd als er niet vóór 30 sep betaald is.",
     },
     {
@@ -455,6 +466,12 @@ window.FORTIS_DATA = {
       status: "incasso", vervaldatum: "2026-10-02", prioriteit: 2,
       schuifruimte: "nee", max_uitstel_dagen: 0,
       contact: "GGN Incasso, dossier 2026-44871", entiteit: "RTT Vastgoed BV",
+      iban: "NL44 INGB 0001 2345 67", tnv: "GGN Incasso", betaalkenmerk: "2026-44871",
+      facturen: [
+        { id: "f0201", nummer: "EN-8812-Q2", datum: "2026-07-01", vervaldatum: "2026-08-15", bedrag: 6705, open: 6705, bv: "RTT Vastgoed BV", omschrijving: "Energie Q2 2026" },
+        { id: "f0202", nummer: "GGN-44871-K", datum: "2026-09-05", vervaldatum: "2026-10-02", bedrag: 745, open: 745, bv: "RTT Vastgoed BV", omschrijving: "Incassokosten" },
+      ],
+      betalingen: [],
       notitie: "Incassokosten € 745 al in rekening gebracht.",
     },
     {
@@ -464,6 +481,13 @@ window.FORTIS_DATA = {
       termijn_bedrag: 8100, volgende_termijn: "2026-10-01", termijnen_resterend: 6,
       schuifruimte: "nee", max_uitstel_dagen: 0,
       contact: "Invorderingsteam Eindhoven", entiteit: "Fortis Vastgoed BV",
+      iban: "NL86 INGB 0002 4455 88", tnv: "Belastingdienst", betaalkenmerk: "1234 5678 9012 3456",
+      facturen: [
+        { id: "f0301", nummer: "Aanslag OB Q2-2026", datum: "2026-07-31", vervaldatum: "2026-08-31", bedrag: 56700, open: 48600, bv: "Fortis Vastgoed BV", omschrijving: "Omzetbelasting 2e kwartaal" },
+      ],
+      betalingen: [
+        { id: "b0301", datum: "2026-09-01", bedrag: 8100, bv: "Fortis Vastgoed BV", factuur_id: "f0301", notitie: "Termijn 1 van 7" },
+      ],
       notitie: "Bij een gemiste termijn vervalt de regeling en is het volledige bedrag direct opeisbaar.",
     },
     {
@@ -473,6 +497,12 @@ window.FORTIS_DATA = {
       termijn_bedrag: 4733, volgende_termijn: "2026-10-05", termijnen_resterend: 3,
       schuifruimte: "beperkt", max_uitstel_dagen: 7,
       contact: "Beheerder VvE, J. Bakker", entiteit: "RTT Vastgoed BV",
+      iban: "NL69 ABNA 0417 1643 00", tnv: "VvE Coolsingel 88", betaalkenmerk: "Bouwnr. 4-6",
+      facturen: [
+        { id: "f0401", nummer: "VVE-2026-Q3", datum: "2026-07-01", vervaldatum: "2026-07-31", bedrag: 7100, open: 7100, bv: "RTT Vastgoed BV", omschrijving: "Servicekosten Q3" },
+        { id: "f0402", nummer: "VVE-2026-Q4", datum: "2026-09-15", vervaldatum: "2026-10-31", bedrag: 7100, open: 7100, bv: "RTT Vastgoed BV", omschrijving: "Servicekosten Q4" },
+      ],
+      betalingen: [],
       notitie: "Termijn kan in overleg een week later.",
     },
     {
@@ -481,6 +511,11 @@ window.FORTIS_DATA = {
       status: "open", vervaldatum: "2026-10-10", prioriteit: 3,
       schuifruimte: "ja", max_uitstel_dagen: 30,
       contact: "P. Smits", entiteit: "Fortis Vastgoed BV",
+      iban: "NL20 KNAB 0255 6677 01", tnv: "Adviesbureau Fiscaal Zuid BV", betaalkenmerk: "2026-0931",
+      facturen: [
+        { id: "f0501", nummer: "2026-0931", datum: "2026-09-10", vervaldatum: "2026-10-10", bedrag: 9800, open: 9800, bv: "Fortis Vastgoed BV", omschrijving: "Advies herstructurering" },
+      ],
+      betalingen: [],
       notitie: "Vaste relatie, uitstel van een maand is eerder akkoord gegeven.",
     },
     {
@@ -489,6 +524,11 @@ window.FORTIS_DATA = {
       status: "open", vervaldatum: "2026-10-15", prioriteit: 1,
       schuifruimte: "beperkt", max_uitstel_dagen: 14,
       contact: "H. van Rijn", entiteit: "EHV Dev BV",
+      iban: "NL35 RABO 0301 2299 45", tnv: "Bouwbedrijf Van Rijn BV", betaalkenmerk: "STP7-T5",
+      facturen: [
+        { id: "f0601", nummer: "VR-26-0055", datum: "2026-09-15", vervaldatum: "2026-10-15", bedrag: 186000, open: 186000, bv: "EHV Dev BV", omschrijving: "Termijn 5 — ruwbouw 70%" },
+      ],
+      betalingen: [],
       notitie: "Aannemer legt het werk stil bij meer dan 30 dagen achterstand. Betalen uit tranche 4.",
     },
     {
@@ -497,6 +537,11 @@ window.FORTIS_DATA = {
       status: "open", vervaldatum: "2026-10-31", prioriteit: 2,
       schuifruimte: "beperkt", max_uitstel_dagen: 30,
       contact: "Belastingen Rotterdam", entiteit: "RTT Vastgoed BV",
+      iban: "NL32 BNGH 0285 1234 56", tnv: "Gemeente Rotterdam", betaalkenmerk: "Aanslag 5500.1234.2026",
+      facturen: [
+        { id: "f0701", nummer: "5500.1234.2026", datum: "2026-02-28", vervaldatum: "2026-10-31", bedrag: 22000, open: 22000, bv: "RTT Vastgoed BV", omschrijving: "OZB eigenaren 2026" },
+      ],
+      betalingen: [],
       notitie: "Uitstel of betalen in termijnen aan te vragen via Mijn Loket.",
     },
     {
@@ -505,6 +550,11 @@ window.FORTIS_DATA = {
       status: "open", vervaldatum: "2026-11-20", prioriteit: 3,
       schuifruimte: "ja", max_uitstel_dagen: 45,
       contact: "L. Hoekstra", entiteit: "Fortis Vastgoed BV",
+      iban: "NL58 ABNA 0612 3456 78", tnv: "Makelaardij Noord BV", betaalkenmerk: "MN-2026-117",
+      facturen: [
+        { id: "f0801", nummer: "MN-2026-117", datum: "2026-10-21", vervaldatum: "2026-11-20", bedrag: 18500, open: 18500, bv: "Fortis Vastgoed BV", omschrijving: "Courtage verhuur Markt 15" },
+      ],
+      betalingen: [],
       notitie: "",
     },
     {
@@ -513,6 +563,12 @@ window.FORTIS_DATA = {
       status: "betaald", vervaldatum: "2026-09-15", prioriteit: 3,
       schuifruimte: "nee", max_uitstel_dagen: 0,
       contact: "", entiteit: "Fortis Vastgoed BV",
+      facturen: [
+        { id: "f0901", nummer: "ND-26-3310", datum: "2026-08-20", vervaldatum: "2026-09-15", bedrag: 3250, open: 0, bv: "Fortis Vastgoed BV", omschrijving: "Akte herfinanciering Leiden" },
+      ],
+      betalingen: [
+        { id: "b0901", datum: "2026-09-12", bedrag: 3250, bv: "Fortis Vastgoed BV", factuur_id: "f0901", notitie: "" },
+      ],
       notitie: "Betaald op 12 sep.",
     },
   ],

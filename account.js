@@ -13,6 +13,7 @@
   const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   const CHANGELOG = [
+    { versie: '1.7', titel: 'Crediteurdossiers', punten: ['Betalen-knop bij elke melding opent het dossier van de crediteur', 'Facturen per BV, eerst te betalen bedrag, betaalgegevens en vrije kas per BV', 'Betalingen registreren, betaalregeling-termijnen en documenten per dossier'] },
     { versie: '1.6', titel: 'Objecten en documenten', punten: ['Nieuwe subpagina Portefeuille → Objecten met een detailpagina per object', 'Documenten per object toevoegen (taxatierapport, koop-/leningovereenkomst, huurcontract, …)', 'Checklist van kerndocumenten per object'] },
     { versie: '1.5', titel: 'Accountmenu en nieuwe navigatie', punten: ['Accountmenu rechtsboven met profiel, thema en gegevens', 'Profielfoto, eigen logo en naam van het dashboard instellen', 'Licht, donker of systeemthema', 'Zijbalk als iconenbalk die uitklapt bij hover (instelbaar)', 'Compactere typografie'] },
     { versie: '1.4', titel: 'Leningovereenkomst uitlezen met AI', punten: ['Upload een PDF of foto; de AI vult de leningvelden in', 'Per veld zekerheid en bronpassage, opslaan pas na controle'] },

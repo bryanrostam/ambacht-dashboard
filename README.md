@@ -113,6 +113,20 @@ Onder **Liquiditeit → Crediteuren** staan alle partijen die betaald moeten wor
 | Schuifruimte + max. uitstel | Of (en hoeveel dagen) de betaling kan schuiven |
 | Betaalregeling | Termijnbedrag per maand, volgende termijn, resterende termijnen |
 
+**Dossier per crediteur.** Klik op **Betalen** naast een melding (ook op het Management-scherm) of op een
+rij in de tabel. Het dossier toont:
+
+- **Eerst te betalen**: bedrag, uiterste datum en waarom (termijn van de regeling, volledig bedrag bij
+  incasso/faillissement, of de facturen die vóór de deadline vervallen)
+- **Betaalgegevens**: IBAN, ten name van, betalingskenmerk (met kopieerknop)
+- **Betalen vanuit**: per BV die op de facturen staat het openstaande bedrag en of de vrije kas van die BV
+  voldoende is
+- **Facturen** (nummer, BV op factuur, factuur-/vervaldatum, bedrag, open) — toevoegen/wijzigen/verwijderen
+- **Betaalregeling**: resterende termijnen · **Betalingen**: historie · **Documenten**: facturen, aanmaningen,
+  sommaties, brieven (opgeslagen in de browser)
+- **Betaling registreren**: boekt af op de oudste (of gekozen) factuur, schuift de betaalregeling een termijn
+  op en zet het dossier op *Betaald* als alles voldaan is
+
 **Wanneer krijg je een melding?** Deadlines worden vergeleken met de datum van *vandaag*.
 
 - **Kritiek (nu betalen):** faillissementsaanvraag dreigt · incasso met deadline ≤ 7 dagen ·
