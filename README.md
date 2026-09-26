@@ -111,7 +111,7 @@ Onder **Liquiditeit → Crediteuren** staan alle partijen die betaald moeten wor
 | Deadline | Uiterste betaaldatum. Bij een betaalregeling telt de *volgende termijn* |
 | Prioriteit | Hoog / Middel / Laag |
 | Schuifruimte + max. uitstel | Of (en hoeveel dagen) de betaling kan schuiven |
-| Betaalregeling | Termijnbedrag per maand, volgende termijn, resterende termijnen |
+| Betaalregeling | Termijnschema: per termijn een deadline en bedrag (vrij in te delen), met totaal |
 
 **Dossier per crediteur.** Klik op **Betalen** naast een melding (ook op het Management-scherm) of op een
 rij in de tabel. Het dossier toont:
@@ -119,10 +119,15 @@ rij in de tabel. Het dossier toont:
 - **Eerst te betalen**: bedrag, uiterste datum en waarom (termijn van de regeling, volledig bedrag bij
   incasso/faillissement, of de facturen die vóór de deadline vervallen)
 - **Betaalgegevens**: IBAN, ten name van, betalingskenmerk (met kopieerknop)
+- **Contactpersonen**: naam, functie, bedrijf/kantoor, rol (crediteur, advocaat, incassobureau, deurwaarder,
+  curator, administratie), telefoon en e-mail (klikbaar)
 - **Betalen vanuit**: per BV die op de facturen staat het openstaande bedrag en of de vrije kas van die BV
   voldoende is
 - **Facturen** (nummer, BV op factuur, factuur-/vervaldatum, bedrag, open) — toevoegen/wijzigen/verwijderen
-- **Betaalregeling**: resterende termijnen · **Betalingen**: historie · **Documenten**: facturen, aanmaningen,
+- **Betaalregeling — termijnschema**: per termijn een eigen bedrag en deadline, met totaal, betaald en nog te
+  betalen. Instellen via *Dossier wijzigen* (of *Schema wijzigen*): termijnen toevoegen/verwijderen of met
+  *Verdeel* gelijk over N maanden verdelen; het formulier laat zien of het schema het openstaande bedrag dekt
+- **Betalingen**: historie · **Documenten**: facturen, aanmaningen,
   sommaties, brieven (opgeslagen in de browser)
 - **Betaling registreren**: boekt af op de oudste (of gekozen) factuur, schuift de betaalregeling een termijn
   op en zet het dossier op *Betaald* als alles voldaan is

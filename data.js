@@ -437,11 +437,13 @@ window.FORTIS_DATA = {
   //  prioriteit:   1 = hoog, 2 = middel, 3 = laag
   //  schuifruimte: "ja" | "beperkt" | "nee"  (+ max_uitstel_dagen)
   //  vervaldatum:  uiterste betaaldatum (deadline)
-  //  Bij een betaalregeling: termijn_bedrag, volgende_termijn, termijnen_resterend
+  //  Bij een betaalregeling: termijnen[] = { datum, bedrag, voldaan } (of termijn_bedrag + volgende_termijn +
+  //  termijnen_resterend voor gelijke maandtermijnen; die worden automatisch omgezet naar termijnen)
   //  Deadlines worden vergeleken met de datum van VANDAAG.
   //  facturen[]:   per factuur nummer, datum, vervaldatum, bedrag, open, bv (entiteit op de factuur)
   //  betalingen[]: geregistreerde betalingen (datum, bedrag, bv, factuur_id)
   //  iban / tnv / betaalkenmerk: betaalgegevens
+  //  contacten[]: naam, functie, bedrijf, rol (crediteur/advocaat/incassobureau/deurwaarder/curator/boekhouding/overig), telefoon, email
   //  bedrag_open = som van de openstaande facturen (wordt automatisch bijgewerkt)
   // ----------------------------------------------------------
   crediteuren: [
@@ -458,6 +460,10 @@ window.FORTIS_DATA = {
         { id: "f0103", nummer: "INC-2026-118", datum: "2026-09-10", vervaldatum: "2026-09-30", bedrag: 2500, open: 2500, bv: "EHV Dev BV", omschrijving: "Buitengerechtelijke incassokosten" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct011", naam: "mr. J. de Groot", functie: "Advocaat", bedrijf: "De Groot & Partners Advocaten", rol: "advocaat", telefoon: "040 123 45 67", email: "j.degroot@voorbeeld.nl" },
+        { id: "ct012", naam: "S. Verbeek", functie: "Financieel manager", bedrijf: "Installatietechniek Brabant BV", rol: "crediteur", telefoon: "040 765 43 21", email: "s.verbeek@voorbeeld.nl" },
+      ],
       notitie: "Advocaat heeft faillissementsaanvraag aangekondigd als er niet vóór 30 sep betaald is.",
     },
     {
@@ -472,6 +478,9 @@ window.FORTIS_DATA = {
         { id: "f0202", nummer: "GGN-44871-K", datum: "2026-09-05", vervaldatum: "2026-10-02", bedrag: 745, open: 745, bv: "RTT Vastgoed BV", omschrijving: "Incassokosten" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct021", naam: "M. Janssen", functie: "Incassomedewerker", bedrijf: "GGN Incasso", rol: "incassobureau", telefoon: "088 111 22 33", email: "incasso@voorbeeld.nl" },
+      ],
       notitie: "Incassokosten € 745 al in rekening gebracht.",
     },
     {
@@ -488,6 +497,9 @@ window.FORTIS_DATA = {
       betalingen: [
         { id: "b0301", datum: "2026-09-01", bedrag: 8100, bv: "Fortis Vastgoed BV", factuur_id: "f0301", notitie: "Termijn 1 van 7" },
       ],
+      contacten: [
+        { id: "ct031", naam: "Team Invordering", functie: "Invordering", bedrijf: "Belastingdienst Eindhoven", rol: "crediteur", telefoon: "0800 0543", email: "" },
+      ],
       notitie: "Bij een gemiste termijn vervalt de regeling en is het volledige bedrag direct opeisbaar.",
     },
     {
@@ -503,6 +515,9 @@ window.FORTIS_DATA = {
         { id: "f0402", nummer: "VVE-2026-Q4", datum: "2026-09-15", vervaldatum: "2026-10-31", bedrag: 7100, open: 7100, bv: "RTT Vastgoed BV", omschrijving: "Servicekosten Q4" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct041", naam: "J. Bakker", functie: "VvE-beheerder", bedrijf: "Bakker VvE Beheer", rol: "crediteur", telefoon: "010 222 33 44", email: "j.bakker@voorbeeld.nl" },
+      ],
       notitie: "Termijn kan in overleg een week later.",
     },
     {
@@ -516,6 +531,9 @@ window.FORTIS_DATA = {
         { id: "f0501", nummer: "2026-0931", datum: "2026-09-10", vervaldatum: "2026-10-10", bedrag: 9800, open: 9800, bv: "Fortis Vastgoed BV", omschrijving: "Advies herstructurering" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct051", naam: "P. Smits", functie: "Partner", bedrijf: "Adviesbureau Fiscaal Zuid BV", rol: "crediteur", telefoon: "073 555 66 77", email: "p.smits@voorbeeld.nl" },
+      ],
       notitie: "Vaste relatie, uitstel van een maand is eerder akkoord gegeven.",
     },
     {
@@ -529,6 +547,10 @@ window.FORTIS_DATA = {
         { id: "f0601", nummer: "VR-26-0055", datum: "2026-09-15", vervaldatum: "2026-10-15", bedrag: 186000, open: 186000, bv: "EHV Dev BV", omschrijving: "Termijn 5 — ruwbouw 70%" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct061", naam: "H. van Rijn", functie: "Directeur", bedrijf: "Bouwbedrijf Van Rijn BV", rol: "crediteur", telefoon: "06 12 34 56 78", email: "h.vanrijn@voorbeeld.nl" },
+        { id: "ct062", naam: "K. Mulder", functie: "Projectadministratie", bedrijf: "Bouwbedrijf Van Rijn BV", rol: "boekhouding", telefoon: "040 888 99 00", email: "administratie@voorbeeld.nl" },
+      ],
       notitie: "Aannemer legt het werk stil bij meer dan 30 dagen achterstand. Betalen uit tranche 4.",
     },
     {
@@ -542,6 +564,9 @@ window.FORTIS_DATA = {
         { id: "f0701", nummer: "5500.1234.2026", datum: "2026-02-28", vervaldatum: "2026-10-31", bedrag: 22000, open: 22000, bv: "RTT Vastgoed BV", omschrijving: "OZB eigenaren 2026" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct071", naam: "Klantcontact Belastingen", functie: "", bedrijf: "Gemeente Rotterdam", rol: "crediteur", telefoon: "14 010", email: "" },
+      ],
       notitie: "Uitstel of betalen in termijnen aan te vragen via Mijn Loket.",
     },
     {
@@ -555,6 +580,9 @@ window.FORTIS_DATA = {
         { id: "f0801", nummer: "MN-2026-117", datum: "2026-10-21", vervaldatum: "2026-11-20", bedrag: 18500, open: 18500, bv: "Fortis Vastgoed BV", omschrijving: "Courtage verhuur Markt 15" },
       ],
       betalingen: [],
+      contacten: [
+        { id: "ct081", naam: "L. Hoekstra", functie: "Makelaar", bedrijf: "Makelaardij Noord BV", rol: "crediteur", telefoon: "050 333 44 55", email: "l.hoekstra@voorbeeld.nl" },
+      ],
       notitie: "",
     },
     {

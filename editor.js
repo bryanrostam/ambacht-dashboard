@@ -58,7 +58,7 @@
     { key: 'categorie', label: 'Categorie', type: 'select', opties: ['leverancier', 'aannemer', 'belasting', 'nutsvoorziening', 'vve', 'adviseur', 'bank', 'overig'] },
     { key: 'entiteit', label: 'Te betalen door (BV)', type: 'text', lijst: 'bv-lijst' },
     { key: 'omschrijving', label: 'Omschrijving / factuur', type: 'text', breed: true },
-    { key: 'contact', label: 'Contactpersoon / dossier', type: 'text', breed: true },
+    { key: 'contact', label: 'Referentie / dossiernummer', type: 'text', breed: true, hint: 'Contactpersonen met telefoon en e-mail beheer je in het dossier' },
     { groep: 'Bedrag, status & deadline' },
     { key: 'bedrag_open', label: 'Openstaand bedrag (€)', type: 'number', step: 1, required: true },
     { key: 'status', label: 'Status', type: 'select', opties: ['open', 'betaalregeling', 'incasso', 'faillissement', 'betaald'],
@@ -67,10 +67,6 @@
     { key: 'prioriteit', label: 'Prioriteit', type: 'select', num: true, opties: [1, 2, 3], labels: { 1: 'Hoog', 2: 'Middel', 3: 'Laag' } },
     { key: 'schuifruimte', label: 'Schuifruimte', type: 'select', opties: ['nee', 'beperkt', 'ja'], labels: { nee: 'Nee — moet op tijd', beperkt: 'Beperkt', ja: 'Ja' } },
     { key: 'max_uitstel_dagen', label: 'Max. uitstel (dagen)', type: 'number', step: 1 },
-    { groep: 'Betaalregeling', id: 'groep-regeling' },
-    { key: 'termijn_bedrag', label: 'Termijnbedrag per maand (€)', type: 'number', step: 1, regeling: true },
-    { key: 'volgende_termijn', label: 'Volgende termijn', type: 'date', regeling: true },
-    { key: 'termijnen_resterend', label: 'Resterende termijnen', type: 'number', step: 1, regeling: true },
     { groep: 'Notities' },
     { key: 'notitie', label: 'Afspraken / notities', type: 'textarea', breed: true },
   ];
@@ -403,21 +399,119 @@
     const c = id ? D.crediteuren.find(x => x.id === id) : { status: 'open', prioriteit: 2, schuifruimte: 'nee', categorie: 'leverancier' };
     if (!c) return;
     const bvs = [...new Set(D.kasstand.map(k => k.entiteit).concat(D.objecten.map(o => o.eigenaar_bv)).filter(Boolean))];
+    // Bestaand schema, of afgeleid van een vast maandbedrag
+    const schema = (c.status === 'betaalregeling' ? (STORE.syncRegeling({ ...c, termijnen: c.termijnen ? c.termijnen.map(t => ({ ...t })) : null }).termijnen || []) : (c.termijnen || []).map(t => ({ ...t })));
     const body = `<datalist id="bv-lijst">${bvs.map(b => `<option value="${esc(b)}">`).join('')}</datalist>
-      <div class="f-grid">${CREDITEUR_VELDEN.map(f => veldHtml(f, c[f.key])).join('')}</div>`;
+      <div class="f-grid">${CREDITEUR_VELDEN.map(f => veldHtml(f, c[f.key])).join('')}</div>
+      <div id="regeling-blok">
+        <div class="f-groep">Betaalregeling — termijnschema</div>
+        <p class="modal-uitleg" style="margin-top:0">Vul per termijn de deadline en het bedrag in. De eerstvolgende openstaande termijn bepaalt de meldingen en het bedrag dat eerst betaald moet worden.</p>
+        <div class="tm-kop"><span>#</span><span>Deadline</span><span>Bedrag (€)</span><span>Status</span><span></span></div>
+        <div id="tm-lijst"></div>
+        <div class="tm-acties">
+          <button type="button" class="btn btn-small" id="tm-plus">+ Termijn</button>
+          <span class="tm-hulp">Of verdeel gelijk:
+            <input type="number" id="tm-aantal" min="1" max="60" value="${Math.max(1, schema.filter(t => t.bedrag - (t.voldaan || 0) > 0).length || 3)}" aria-label="Aantal termijnen"> termijnen, maandelijks vanaf
+            <input type="date" id="tm-start" value="${esc((schema.find(t => t.bedrag - (t.voldaan || 0) > 0) || {}).datum || '')}" aria-label="Eerste deadline">
+            <button type="button" class="btn btn-small" id="tm-verdeel">Verdeel</button>
+          </span>
+        </div>
+        <div class="tm-totaal" id="tm-totaal"></div>
+      </div>`;
     const form = openModal(id ? 'Crediteur wijzigen' : 'Crediteur toevoegen', body, f => {
       const nieuw = leesVelden(f, CREDITEUR_VELDEN, id ? c : {});
       if (nieuw.status === 'betaald') nieuw.bedrag_open = 0;
+      if (nieuw.status === 'betaalregeling') {
+        const rijen = leesTermijnen();
+        if (!rijen.length) { alert('Voeg minstens één termijn toe (deadline en bedrag).'); return; }
+        if (rijen.some(t => !t.datum)) { alert('Elke termijn heeft een deadline nodig.'); return; }
+        nieuw.termijnen = rijen;
+        STORE.syncRegeling(nieuw);
+      }
       if (!id) { nieuw.id = STORE.nieuwId('cr'); D.crediteuren.push(nieuw); }
       opslaanEnHerladen();
     }, id ? () => deleteCrediteur(id) : null);
-    // Betaalregeling-velden alleen tonen bij die status
-    const status = form.elements.status;
-    const toggle = () => {
-      const aan = status.value === 'betaalregeling';
-      form.querySelectorAll('.f-regeling').forEach(el => el.style.display = aan ? '' : 'none');
-      form.querySelector('#groep-regeling').style.display = aan ? '' : 'none';
+
+    // ---- Termijnschema ----
+    const lijstEl = form.querySelector('#tm-lijst');
+    const euroNl = v => '€ ' + (v || 0).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function rijHtml(t, i) {
+      const voldaan = t.voldaan || 0;
+      const vol = voldaan > 0 && voldaan >= (t.bedrag || 0) - 0.005;
+      return `<div class="tm-rij${vol ? ' tm-voldaan' : ''}" data-id="${esc(t.id || '')}" data-voldaan="${voldaan}">
+        <span class="tm-nr">${i + 1}</span>
+        <input type="date" class="tm-datum" value="${esc(t.datum || '')}" aria-label="Deadline termijn ${i + 1}">
+        <input type="number" class="tm-bedrag" step="0.01" min="0" value="${t.bedrag ?? ''}" aria-label="Bedrag termijn ${i + 1}">
+        <span class="tm-status">${vol ? '✓ Betaald' : voldaan > 0 ? euroNl(voldaan) + ' betaald' : 'Open'}</span>
+        <button type="button" class="icon-btn" data-tm-wis aria-label="Termijn verwijderen" ${voldaan > 0 ? 'disabled title="Er is al (deels) betaald op deze termijn"' : ''}>✕</button>
+      </div>`;
+    }
+    function leesTermijnen() {
+      return [...lijstEl.querySelectorAll('.tm-rij')].map(r => ({
+        id: r.dataset.id || STORE.nieuwId('tm'),
+        datum: r.querySelector('.tm-datum').value || null,
+        bedrag: Math.round((parseFloat(r.querySelector('.tm-bedrag').value) || 0) * 100) / 100,
+        voldaan: parseFloat(r.dataset.voldaan) || 0,
+      })).filter(t => t.bedrag > 0 || t.datum);
+    }
+    function tekenLijst(rijen) {
+      lijstEl.innerHTML = rijen.length ? rijen.map(rijHtml).join('') : '<p class="tm-leeg">Nog geen termijnen.</p>';
+      totaal();
+    }
+    function totaal() {
+      lijstEl.querySelectorAll('.tm-nr').forEach((n, i) => n.textContent = i + 1);
+      const rijen = leesTermijnen();
+      const tot = rijen.reduce((s, t) => s + t.bedrag, 0);
+      const voldaan = rijen.reduce((s, t) => s + Math.min(t.voldaan, t.bedrag), 0);
+      const nogOpen = tot - voldaan;
+      const openstaand = parseFloat(form.elements.bedrag_open.value) || 0;
+      const verschil = Math.round((nogOpen - openstaand) * 100) / 100;
+      const volgende = rijen.filter(t => t.bedrag - t.voldaan > 0.005).sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))[0];
+      form.querySelector('#tm-totaal').innerHTML = `
+        <div><span>Totaal regeling</span><strong>${euroNl(tot)}</strong><small>${rijen.length} termijn(en)</small></div>
+        <div><span>Al betaald</span><strong>${euroNl(voldaan)}</strong></div>
+        <div><span>Nog te betalen</span><strong>${euroNl(nogOpen)}</strong><small>${volgende ? 'Eerstvolgende: ' + euroNl(volgende.bedrag - volgende.voldaan) + (volgende.datum ? ' vóór ' + E.fmtDatum(volgende.datum) : '') : 'Geen openstaande termijnen'}</small></div>
+        <div class="${Math.abs(verschil) < 0.01 ? 'tm-ok' : 'tm-afwijking'}"><span>Openstaand bedrag</span><strong>${euroNl(openstaand)}</strong>
+          <small>${Math.abs(verschil) < 0.01 ? '✓ Schema dekt het openstaande bedrag' : verschil > 0 ? '⚠ Schema is ' + euroNl(verschil) + ' hoger dan openstaand' : '⚠ Nog ' + euroNl(-verschil) + ' niet ingepland'}</small></div>`;
+    }
+    tekenLijst(schema);
+    lijstEl.addEventListener('input', totaal);
+    lijstEl.addEventListener('click', e => {
+      const b = e.target.closest('[data-tm-wis]');
+      if (b && !b.disabled) { b.closest('.tm-rij').remove(); if (!lijstEl.querySelector('.tm-rij')) tekenLijst([]); else totaal(); }
+    });
+    form.elements.bedrag_open.addEventListener('input', totaal);
+    form.querySelector('#tm-plus').onclick = () => {
+      const rijen = leesTermijnen();
+      const laatste = rijen[rijen.length - 1];
+      let datum = '';
+      if (laatste && laatste.datum) { const [j, m, d] = laatste.datum.split('-').map(Number); const x = new Date(j, m, d); datum = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
+      const openstaand = parseFloat(form.elements.bedrag_open.value) || 0;
+      const ingepland = rijen.reduce((s, t) => s + (t.bedrag - t.voldaan), 0);
+      tekenLijst([...rijen, { id: '', datum, bedrag: Math.max(0, Math.round((openstaand - ingepland) * 100) / 100) || '', voldaan: 0 }]);
+      const laatsteInput = lijstEl.querySelector('.tm-rij:last-child .tm-datum');
+      if (laatsteInput) laatsteInput.focus();
     };
+    form.querySelector('#tm-verdeel').onclick = () => {
+      const n = Math.max(1, Math.min(60, parseInt(form.querySelector('#tm-aantal').value, 10) || 1));
+      const start = form.querySelector('#tm-start').value;
+      if (!start) { alert('Kies de deadline van de eerste termijn.'); return; }
+      const behouden = leesTermijnen().filter(t => t.voldaan > 0);   // (deels) betaalde termijnen blijven staan
+      const restBehouden = behouden.reduce((t, x) => t + Math.max(0, x.bedrag - x.voldaan), 0);
+      const openstaand = Math.max(0, (parseFloat(form.elements.bedrag_open.value) || 0) - restBehouden);
+      const perTermijn = Math.floor(openstaand / n * 100) / 100;
+      const [j, m, d] = start.split('-').map(Number);
+      const nieuw = Array.from({ length: n }, (_, i) => {
+        const x = new Date(j, m - 1 + i, d);
+        return { id: '', datum: x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'),
+          bedrag: i === n - 1 ? Math.round((openstaand - perTermijn * (n - 1)) * 100) / 100 : perTermijn, voldaan: 0 };
+      });
+      tekenLijst([...behouden, ...nieuw]);
+    };
+
+    // Termijnschema alleen tonen bij status betaalregeling
+    const status = form.elements.status;
+    const toggle = () => { form.querySelector('#regeling-blok').style.display = status.value === 'betaalregeling' ? '' : 'none'; };
     status.addEventListener('change', toggle);
     toggle();
     // Openstaand bedrag komt uit de facturen als die er zijn

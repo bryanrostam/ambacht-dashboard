@@ -13,6 +13,7 @@
   const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   const CHANGELOG = [
+    { versie: '1.8', titel: 'Contactpersonen en termijnschema', punten: ['Contactpersonen per crediteur met functie, bedrijf, rol, telefoon en e-mail', 'Betaalregeling met eigen termijnen: bedrag A vóór deadline A, bedrag B vóór deadline B, met totaal', 'Betalingen worden automatisch op de termijnen afgeboekt'] },
     { versie: '1.7', titel: 'Crediteurdossiers', punten: ['Betalen-knop bij elke melding opent het dossier van de crediteur', 'Facturen per BV, eerst te betalen bedrag, betaalgegevens en vrije kas per BV', 'Betalingen registreren, betaalregeling-termijnen en documenten per dossier'] },
     { versie: '1.6', titel: 'Objecten en documenten', punten: ['Nieuwe subpagina Portefeuille → Objecten met een detailpagina per object', 'Documenten per object toevoegen (taxatierapport, koop-/leningovereenkomst, huurcontract, …)', 'Checklist van kerndocumenten per object'] },
     { versie: '1.5', titel: 'Accountmenu en nieuwe navigatie', punten: ['Accountmenu rechtsboven met profiel, thema en gegevens', 'Profielfoto, eigen logo en naam van het dashboard instellen', 'Licht, donker of systeemthema', 'Zijbalk als iconenbalk die uitklapt bij hover (instelbaar)', 'Compactere typografie'] },

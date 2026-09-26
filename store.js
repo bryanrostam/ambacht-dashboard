@@ -42,6 +42,40 @@ window.STORE = (function () {
     });
   }
 
+  // ---------- BETAALREGELING: termijnschema ----------
+  // termijnen[]: { id, datum: "YYYY-MM-DD", bedrag, voldaan }  (voldaan = al betaald deel)
+  // De oude velden termijn_bedrag / volgende_termijn / termijnen_resterend worden hieruit afgeleid,
+  // zodat de rest van het dashboard (meldingen, eerst te betalen) er automatisch mee rekent.
+  function plusMaand(iso, n) {
+    const [j, m, d] = iso.split('-').map(Number);
+    const x = new Date(j, m - 1 + n, d || 1);
+    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  }
+  function termijnenUitVastBedrag(c) {
+    if (!c.termijn_bedrag || !c.volgende_termijn) return [];
+    const uit = [];
+    let rest = c.bedrag_open || 0;
+    const n = c.termijnen_resterend || Math.ceil(rest / c.termijn_bedrag);
+    for (let i = 0; i < n && rest > 0.005; i++) {
+      const b = Math.round((i === n - 1 ? rest : Math.min(c.termijn_bedrag, rest)) * 100) / 100;   // laatste termijn: restant
+      uit.push({ id: 't' + (i + 1) + '_' + Math.random().toString(36).slice(2, 6), datum: plusMaand(c.volgende_termijn, i), bedrag: b, voldaan: 0 });
+      rest -= b;
+    }
+    return uit;
+  }
+  function syncRegeling(c) {
+    if (c.status !== 'betaalregeling') return c;
+    if (!Array.isArray(c.termijnen) || !c.termijnen.length) c.termijnen = termijnenUitVastBedrag(c);
+    c.termijnen.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''));
+    const open = c.termijnen.filter(t => (t.bedrag || 0) - (t.voldaan || 0) > 0.005);
+    const eerst = open[0];
+    c.termijn_bedrag = eerst ? Math.round(((eerst.bedrag || 0) - (eerst.voldaan || 0)) * 100) / 100 : 0;
+    c.volgende_termijn = eerst ? eerst.datum : null;
+    c.termijnen_resterend = open.length;
+    return c;
+  }
+  (D.crediteuren || []).forEach(syncRegeling);
+
   function bewaar() {
     const uit = {};
     VELDEN.forEach(k => uit[k] = D[k]);
@@ -69,6 +103,7 @@ window.STORE = (function () {
       throw new Error('Bestand bevat geen objecten en leningen');
     }
     VELDEN.forEach(k => { if (Array.isArray(bron[k])) D[k] = schoon(bron[k]); });
+    (D.crediteuren || []).forEach(syncRegeling);
     return bewaar();
   }
 
@@ -76,5 +111,5 @@ window.STORE = (function () {
     return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   }
 
-  return { bewaar, herstel, importeer, heeftWijzigingen, nieuwId, schoon, VELDEN };
+  return { bewaar, herstel, importeer, heeftWijzigingen, nieuwId, schoon, VELDEN, syncRegeling };
 })();

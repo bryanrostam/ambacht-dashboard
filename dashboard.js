@@ -928,7 +928,7 @@ function buildCrediteuren() {
     kpi('Totaal openstaand', E.fmt(som(actief)), actief.length + ' partijen', 'kv-red'),
     kpi('Te betalen ≤ 14 dagen', E.fmt(teBetalen14), `${binnen14.length} betalingen · vrije kas ${E.fmt(vrijeKas)}`, teBetalen14 > vrijeKas ? 'kv-red' : 'kv-amber'),
     kpi('Incasso / faillissement', String(incasso.length), incasso.length ? E.fmt(som(incasso)) + ' — direct oppakken' : 'Geen', incasso.length ? 'kv-red' : 'kv-green'),
-    kpi('Betaalregelingen', String(regelingen.length), E.fmt(regelingen.reduce((s, c) => s + (c.termijn_bedrag || 0), 0)) + ' per maand', 'kv-blue'),
+    kpi('Betaalregelingen', String(regelingen.length), E.fmt(regelingen.reduce((s, c) => s + (c.termijn_bedrag || 0), 0)) + ' aan eerstvolgende termijnen', 'kv-blue'),
   ].join('');
 
   // Nu betalen
@@ -947,10 +947,10 @@ function buildCrediteuren() {
 
   // Betaalregelingen
   document.getElementById('cred-regelingen').innerHTML = regelingen.length ? `
-    <thead><tr><th>Partij</th><th>Termijn</th><th>Volgende</th><th>Termijnen</th><th>Restschuld</th></tr></thead>
+    <thead><tr><th>Partij</th><th>Volgende termijn</th><th>Deadline</th><th>Nog te gaan</th><th>Restschuld</th></tr></thead>
     <tbody>${regelingen.map(c => `<tr class="klikbaar" onclick="openDossier('${esc(c.id)}')">
       <td class="cred-naam">${esc(c.naam)}</td>
-      <td class="num">${E.fmt(c.termijn_bedrag)}/mnd</td>
+      <td class="num">${E.fmt(c.termijn_bedrag)}</td>
       <td class="${c.urgentie.niveau === 'kritiek' ? 'red' : c.urgentie.niveau === 'aandacht' ? 'amber' : ''} td-nowrap">${E.fmtDatum(c.volgende_termijn)}<br><span class="cred-dagen">${E.dagenTekst(c.urgentie.dagen)}</span></td>
       <td class="num">${c.termijnen_resterend ?? '—'}</td>
       <td class="num">${E.fmt(c.bedrag_open)}</td>
@@ -972,7 +972,12 @@ function buildCrediteuren() {
   actief.forEach(c => {
     // alle geplande betalingen: bij regeling elke maand een termijn
     const momenten = [];
-    if (c.status === 'betaalregeling' && c.volgende_termijn && c.termijn_bedrag) {
+    if (c.status === 'betaalregeling' && Array.isArray(c.termijnen) && c.termijnen.length) {
+      c.termijnen.forEach(t => {
+        const rest = (t.bedrag || 0) - (t.voldaan || 0);
+        if (rest > 0 && t.datum) { const [j, m, d] = E.parseDatum(t.datum); momenten.push({ datum: new Date(j, m, d), bedrag: rest }); }
+      });
+    } else if (c.status === 'betaalregeling' && c.volgende_termijn && c.termijn_bedrag) {
       let rest = c.bedrag_open;
       for (let i = 0; i < (c.termijnen_resterend || 12) && rest > 0; i++) {
         const [j, m, d] = E.parseDatum(c.volgende_termijn);

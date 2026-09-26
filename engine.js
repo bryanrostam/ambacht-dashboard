@@ -304,7 +304,12 @@ window.ENGINE = (function () {
     };
     crediteuren().forEach(c => {
       if (c.status === 'betaald' || !c.bedrag_open) return;
-      if (c.status === 'betaalregeling' && c.termijn_bedrag && c.volgende_termijn) {
+      if (c.status === 'betaalregeling' && Array.isArray(c.termijnen) && c.termijnen.length) {
+        c.termijnen.forEach(t => {
+          const rest = (t.bedrag || 0) - (t.voldaan || 0);
+          if (rest > 0 && t.datum) plus(t.datum.substring(0, 7), rest);
+        });
+      } else if (c.status === 'betaalregeling' && c.termijn_bedrag && c.volgende_termijn) {
         let rest = c.bedrag_open;
         const n = c.termijnen_resterend || Math.ceil(rest / c.termijn_bedrag);
         for (let i = 0; i < n && rest > 0; i++) {
