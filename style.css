@@ -827,3 +827,25 @@ body { font-size: 14px; }
 .cl-titel { font-weight: 600; margin-bottom: 4px; }
 .cl-item ul { margin-left: 16px; color: var(--text-2); font-size: 13.5px; display: grid; gap: 2px; }
 .kpi-label { overflow-wrap: anywhere; }
+
+/* ---- Profielfoto, logo, afbeeldingkiezer ---- */
+.avatar-btn.met-foto { padding: 0; overflow: hidden; }
+.avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pm-profiel.met-foto { display: grid; grid-template-columns: 36px 1fr; column-gap: 10px; align-items: center; }
+.pm-profiel.met-foto img { grid-row: span 2; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.tb-logo.met-afb img { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; display: block; }
+.afb-kiezer { display: flex; align-items: center; gap: 16px; }
+.afb-voorbeeld {
+  width: 64px; height: 64px; flex-shrink: 0; border-radius: 12px;
+  border: 1px dashed var(--border-2); background: var(--bg-card);
+  display: grid; place-items: center; overflow: hidden;
+  font-size: 12px; color: var(--text-3);
+}
+.afb-voorbeeld.rond { border-radius: 50%; }
+.afb-voorbeeld img { width: 100%; height: 100%; object-fit: cover; }
+.afb-voorbeeld:not(.rond) img { object-fit: contain; padding: 6px; }
+.afb-acties { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--text-2); }
+.afb-acties > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.afb-titel { color: var(--text-1); font-weight: 500; }
+.afb-fout { color: var(--red); font-size: 12.5px; }
+.afb-fout:empty { display: none; }

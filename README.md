@@ -23,7 +23,8 @@ ambacht-dashboard/
 
 - **Zijbalk:** een smalle iconenbalk die bij hover uitklapt met de namen. Via de knop onderaan
   (*Zijbalk*) kies je: *Uitklappen bij hover*, *Altijd uitgeklapt* of *Ingeklapt*.
-- **Accountmenu** (rondje rechtsboven): profiel (naam/e-mail), changelog, pagina afdrukken,
+- **Accountmenu** (rondje rechtsboven) → *Account*: profielfoto, naam, e-mail en functie, plus het
+  dashboard zelf: eigen logo, naam en label in de bovenbalk. Verder in het menu: changelog, pagina afdrukken,
   thema (*Systeem*, *Donker*, *Licht*), tijdzone en de gegevensknoppen (exporteren, importeren, herstellen).
 - Profiel en voorkeuren worden in je browser bewaard. Er is (nog) geen echte login.
 
