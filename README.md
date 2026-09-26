@@ -9,9 +9,11 @@
 ambacht-dashboard/
 ├── index.html      ← Open dit in je browser
 ├── style.css       ← Huisstijl (donker thema, kleuren, fonts)
-├── data.js         ← ✏️ DIT IS HET ENIGE BESTAND DAT JIJ AANPAST
+├── data.js         ← ✏️ Standaarddata (basis voor het dashboard)
+├── store.js        ← Bewaart wijzigingen uit het dashboard in je browser
 ├── engine.js       ← Alle berekeningen (niet aanpassen)
 ├── dashboard.js    ← Alle views (niet aanpassen)
+├── editor.js       ← Formulieren om objecten en leningen te beheren
 └── README.md       ← Dit bestand
 ```
 
@@ -26,6 +28,28 @@ ambacht-dashboard/
 | Waardering | Waardering, value bridge, sensitivity, exit readiness & risico |
 | Groepsstructuur | Organogram (klik op een entiteit voor details) |
 | Eigenaren | Look-through belang per eigenaar, equity calls |
+
+### Objecten en leningen beheren in het dashboard
+
+- **Portefeuille → + Object toevoegen**, of klik op een rij om een object te wijzigen of te verwijderen.
+  Per object vul je in: algemene gegevens, waarde & IRR, exploitatiekosten per jaar en huurcontracten.
+- **Financiering → + Lening toevoegen**, of klik op een rij om een lening te wijzigen of te verwijderen.
+- Wijzigingen worden direct doorgerekend in alle schermen (KPI's, meldingen, forecast, covenants).
+
+**Waar worden wijzigingen bewaard?** In je browser (localStorage). Ze zijn dus alleen zichtbaar
+op dit apparaat en in deze browser, en verdwijnen als je browsergegevens wist of een privévenster gebruikt.
+
+Onderaan de zijbalk (onder *Gegevens*):
+
+| Knop | Wat het doet |
+|---|---|
+| Exporteer data.js | Downloadt alle data, inclusief je wijzigingen, als nieuw `data.js` |
+| Importeer bestand | Laadt een eerder geëxporteerd bestand (bijv. op een ander apparaat) |
+| Herstel demo-data | Wist je wijzigingen in deze browser en gaat terug naar `data.js` |
+
+**Wijzigingen voor iedereen vastleggen:** exporteer `data.js`, vervang het bestand in de repository en
+push naar `main`. Daarna ziet iedereen dezelfde data. Klik zelf daarna op *Herstel demo-data*, zodat je
+browser de nieuwe `data.js` gebruikt in plaats van je lokale kopie.
 
 ### Velden voor het Management-scherm
 

@@ -46,6 +46,7 @@ function nav(id, el) {
 }
 
 // ---- HELPERS ----
+const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const badge = (txt, cls) => `<span class="badge badge-${cls}">${txt}</span>`;
 const kpi = (label, val, sub, colorCls = '') =>
   `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value ${colorCls}">${val}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
@@ -258,9 +259,9 @@ function buildPortfolio() {
     const schuld = ltv?.schuld || 0;
     const ltvPct = ltv?.ltv;
     const ltvCls = ltvPct ? (ltvPct > 70 ? 'red' : ltvPct > 60 ? 'amber' : '') : '';
-    return `<tr>
-      <td style="font-weight:600">${obj.naam}</td>
-      <td>${obj.stad}</td>
+    return `<tr data-id="${esc(obj.id)}">
+      <td style="font-weight:600">${esc(obj.naam)}</td>
+      <td>${esc(obj.stad)}</td>
       <td>${obj.type}</td>
       <td>${statusBadge(obj.status)}</td>
       <td class="num">${E.fmt(obj.marktwaarde)}</td>
@@ -499,14 +500,14 @@ function buildFinanciering() {
     const statusTxt = maanden < 6 ? 'Kritiek' : maanden < 9 ? 'Actie vereist' : 'Actief';
     const ltv = l.object_id ? E.ltvPerObject().find(o => o.id === l.object_id)?.ltv : null;
     const dscr = l.covenant_dscr_min ? (E.totalNOI() / (E.maandelijkseSchulddienst() * 12)).toFixed(2) : '—';
-    return `<tr>
-      <td style="font-weight:600">${l.naam}</td>
-      <td>${obj?.naam || 'Groepsniveau'}</td>
+    return `<tr data-id="${esc(l.id)}">
+      <td style="font-weight:600">${esc(l.naam)}</td>
+      <td>${obj ? esc(obj.naam) : 'Groepsniveau'}</td>
       <td>${l.type}</td>
       <td class="num">${E.fmt(l.huidig_saldo)}</td>
-      <td class="num">${l.rente_pct}%</td>
+      <td class="num">${l.rente_pct == null ? '—' : String(l.rente_pct).replace('.', ',') + '%'}</td>
       <td>${l.aflossing_type}</td>
-      <td class="${maanden < 9 ? (maanden < 6 ? 'red' : 'amber') : ''}" style="font-weight:${maanden < 9 ? 600 : 400}">${l.einddatum || '—'}</td>
+      <td class="${maanden < 9 ? (maanden < 6 ? 'red' : 'amber') : ''}" style="font-weight:${maanden < 9 ? 600 : 400}">${E.fmtDatum(l.einddatum)}</td>
       <td class="num ${ltv && ltv > (l.covenant_ltv_max || 100) * 0.9 ? 'amber' : ''}">${ltv ? ltv.toFixed(0) + '%' : '—'}</td>
       <td class="num">${dscr}</td>
       <td>${badge(statusTxt, statusCls)}</td>
