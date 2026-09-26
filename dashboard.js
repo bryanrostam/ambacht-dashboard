@@ -35,6 +35,7 @@ function nav(id, el) {
   const builders = {
     liq: [buildLiq],
     crediteuren: [buildCrediteuren],
+    objecten: [buildObjecten],
     portfolio: [buildPortfolio, buildTimeline, buildScenario],
     financiering: [buildFinanciering, buildCovenant],
     valuation: [buildValuation, buildExit],

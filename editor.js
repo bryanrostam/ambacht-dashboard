@@ -235,7 +235,9 @@
     D.objecten = D.objecten.filter(o => o.id !== id);
     D.huurcontracten = D.huurcontracten.filter(h => h.object_id !== id);
     D.exploitatiekosten = D.exploitatiekosten.filter(k => k.object_id !== id);
-    opslaanEnHerladen();
+    // Ook de documenten van dit object wissen
+    if (window.DOCS) DOCS.verwijderVoorObject(id).catch(() => {}).finally(opslaanEnHerladen);
+    else opslaanEnHerladen();
     return true;
   }
 

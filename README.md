@@ -35,7 +35,8 @@ ambacht-dashboard/
 | Management | KPI's, actieve meldingen, kasverloop 24 maanden, pipeline |
 | Liquiditeit | Cashflow forecast (incl. crediteurbetalingen), tabel 12 maanden, cash per entiteit |
 | ↳ Crediteuren | Alle partijen die betaald moeten worden: status, deadlines, prio, schuifruimte, betaalregelingen, betaalplanning |
-| Portefeuille | Objecten, NOI/LTV, planning & timeline, scenario's & stress testing |
+| Portefeuille | Objectoverzicht, NOI/LTV, planning & timeline, scenario's & stress testing |
+| ↳ Objecten | Per object: kengetallen, huurcontracten, leningen en documenten met checklist |
 | Financiering | Leningen, maturity, bouwtranches, covenant monitoring |
 | Waardering | Waardering, value bridge, sensitivity, exit readiness & risico |
 | Groepsstructuur | Organogram (klik op een entiteit voor details) |
@@ -82,6 +83,22 @@ In het formulier **Lening toevoegen / wijzigen** staat bovenaan *Leningovereenko
 
 Kosten: ongeveer € 0,05–0,30 per document, afhankelijk van het aantal pagina's.
 De functie werkt alleen op de online Vercel-versie, niet als je `index.html` lokaal opent.
+
+### Objecten en documenten
+
+Onder **Portefeuille → Objecten** staat per object een kaart met waarde, NOI, LTV en hoeveel
+kerndocumenten er zijn. Klik op een object voor de detailpagina:
+
+- Kengetallen, huurcontracten en gekoppelde leningen
+- **Documenten**: sleep bestanden in het vak of klik *Documenten toevoegen* (meerdere tegelijk, max. 50 MB
+  per bestand). De soort (taxatierapport, koopovereenkomst, leningovereenkomst, huurovereenkomst, kadaster,
+  energielabel, verzekering, …) wordt geraden uit de bestandsnaam en is aan te passen via ✎, net als de
+  documentdatum en een notitie. Klik op de naam om het document te openen.
+- **Checklist kerndocumenten** laat zien wat er nog ontbreekt (afhankelijk van de status van het object,
+  of er een lening of huurcontract is, enz.)
+
+**Let op:** documenten worden in de browser opgeslagen (IndexedDB), dus alleen op dit apparaat en in deze
+browser. Ze gaan niet mee in *Exporteer data.js*. Gebruik *Download alles* op de objectpagina als back-up.
 
 ### Crediteuren
 
