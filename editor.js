@@ -52,6 +52,29 @@
     { key: 'covenant_dscr_min', label: 'Covenant DSCR min', type: 'number', step: 0.01 },
   ];
 
+  const CREDITEUR_VELDEN = [
+    { groep: 'Partij' },
+    { key: 'naam', label: 'Naam partij', type: 'text', required: true, placeholder: 'Belastingdienst' },
+    { key: 'categorie', label: 'Categorie', type: 'select', opties: ['leverancier', 'aannemer', 'belasting', 'nutsvoorziening', 'vve', 'adviseur', 'bank', 'overig'] },
+    { key: 'entiteit', label: 'Te betalen door (BV)', type: 'text', lijst: 'bv-lijst' },
+    { key: 'omschrijving', label: 'Omschrijving / factuur', type: 'text', breed: true },
+    { key: 'contact', label: 'Contactpersoon / dossier', type: 'text', breed: true },
+    { groep: 'Bedrag, status & deadline' },
+    { key: 'bedrag_open', label: 'Openstaand bedrag (€)', type: 'number', step: 1, required: true },
+    { key: 'status', label: 'Status', type: 'select', opties: ['open', 'betaalregeling', 'incasso', 'faillissement', 'betaald'],
+      labels: { open: 'Open', betaalregeling: 'Betaalregeling', incasso: 'Incasso', faillissement: 'Faillissementsaanvraag dreigt', betaald: 'Betaald' } },
+    { key: 'vervaldatum', label: 'Deadline (uiterste betaaldatum)', type: 'date' },
+    { key: 'prioriteit', label: 'Prioriteit', type: 'select', num: true, opties: [1, 2, 3], labels: { 1: 'Hoog', 2: 'Middel', 3: 'Laag' } },
+    { key: 'schuifruimte', label: 'Schuifruimte', type: 'select', opties: ['nee', 'beperkt', 'ja'], labels: { nee: 'Nee — moet op tijd', beperkt: 'Beperkt', ja: 'Ja' } },
+    { key: 'max_uitstel_dagen', label: 'Max. uitstel (dagen)', type: 'number', step: 1 },
+    { groep: 'Betaalregeling', id: 'groep-regeling' },
+    { key: 'termijn_bedrag', label: 'Termijnbedrag per maand (€)', type: 'number', step: 1, regeling: true },
+    { key: 'volgende_termijn', label: 'Volgende termijn', type: 'date', regeling: true },
+    { key: 'termijnen_resterend', label: 'Resterende termijnen', type: 'number', step: 1, regeling: true },
+    { groep: 'Notities' },
+    { key: 'notitie', label: 'Afspraken / notities', type: 'textarea', breed: true },
+  ];
+
   // ---------- MODAL ----------
   const modal = document.createElement('dialog');
   modal.className = 'modal';
@@ -59,26 +82,28 @@
   modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
 
   function veldHtml(f, waarde) {
-    if (f.groep) return `<div class="f-groep">${f.groep}</div>`;
+    if (f.groep) return `<div class="f-groep"${f.id ? ` id="${f.id}"` : ''}>${f.groep}</div>`;
     const id = 'f-' + f.key;
     const req = f.required ? ' required' : '';
     let input;
     if (f.type === 'select') {
-      input = `<select id="${id}" name="${f.key}">${f.opties.map(o => `<option${o === waarde ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+      input = `<select id="${id}" name="${f.key}">${f.opties.map(o => `<option value="${o}"${String(o) === String(waarde) ? ' selected' : ''}>${f.labels ? f.labels[o] : o}</option>`).join('')}</select>`;
+    } else if (f.type === 'textarea') {
+      input = `<textarea id="${id}" name="${f.key}">${esc(waarde)}</textarea>`;
     } else if (f.type === 'object') {
       input = `<select id="${id}" name="${f.key}"><option value="">Groepsniveau (geen object)</option>${D.objecten.map(o =>
         `<option value="${esc(o.id)}"${o.id === waarde ? ' selected' : ''}>${esc(o.naam)} — ${esc(o.stad)}</option>`).join('')}</select>`;
     } else {
       input = `<input id="${id}" name="${f.key}" type="${f.type}"${f.step ? ` step="${f.step}"` : ''}${f.lijst ? ` list="${f.lijst}"` : ''} value="${esc(waarde)}"${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''}${req}>`;
     }
-    return `<label class="f-veld" for="${id}"><span>${f.label}${f.required ? ' *' : ''}</span>${input}${f.hint ? `<small>${f.hint}</small>` : ''}</label>`;
+    return `<label class="f-veld${f.breed ? ' f-breed' : ''}${f.regeling ? ' f-regeling' : ''}" for="${id}"><span>${f.label}${f.required ? ' *' : ''}</span>${input}${f.hint ? `<small>${f.hint}</small>` : ''}</label>`;
   }
 
   function leesVelden(form, velden, doel) {
     velden.filter(f => f.key).forEach(f => {
       const el = form.elements[f.key];
       const v = el.value.trim();
-      if (f.type === 'number') {
+      if (f.type === 'number' || f.num) {
         doel[f.key] = v === '' ? null : parseFloat(v);
       } else if (f.type === 'object' || f.key === 'eigenaar_bv') {
         doel[f.key] = v === '' ? null : v;
@@ -237,6 +262,39 @@
     return true;
   }
 
+  // ---------- CREDITEUREN ----------
+  function editCrediteur(id) {
+    if (!D.crediteuren) D.crediteuren = [];
+    const c = id ? D.crediteuren.find(x => x.id === id) : { status: 'open', prioriteit: 2, schuifruimte: 'nee', categorie: 'leverancier' };
+    if (!c) return;
+    const bvs = [...new Set(D.kasstand.map(k => k.entiteit).concat(D.objecten.map(o => o.eigenaar_bv)).filter(Boolean))];
+    const body = `<datalist id="bv-lijst">${bvs.map(b => `<option value="${esc(b)}">`).join('')}</datalist>
+      <div class="f-grid">${CREDITEUR_VELDEN.map(f => veldHtml(f, c[f.key])).join('')}</div>`;
+    const form = openModal(id ? 'Crediteur wijzigen' : 'Crediteur toevoegen', body, f => {
+      const nieuw = leesVelden(f, CREDITEUR_VELDEN, id ? c : {});
+      if (nieuw.status === 'betaald') nieuw.bedrag_open = 0;
+      if (!id) { nieuw.id = STORE.nieuwId('cr'); D.crediteuren.push(nieuw); }
+      opslaanEnHerladen();
+    }, id ? () => deleteCrediteur(id) : null);
+    // Betaalregeling-velden alleen tonen bij die status
+    const status = form.elements.status;
+    const toggle = () => {
+      const aan = status.value === 'betaalregeling';
+      form.querySelectorAll('.f-regeling').forEach(el => el.style.display = aan ? '' : 'none');
+      form.querySelector('#groep-regeling').style.display = aan ? '' : 'none';
+    };
+    status.addEventListener('change', toggle);
+    toggle();
+  }
+
+  function deleteCrediteur(id) {
+    const c = (D.crediteuren || []).find(x => x.id === id);
+    if (!c || !confirm(`Crediteur "${c.naam}" verwijderen?\nTip: zet de status op "Betaald" als je de historie wilt bewaren.`)) return false;
+    D.crediteuren = D.crediteuren.filter(x => x.id !== id);
+    opslaanEnHerladen();
+    return true;
+  }
+
   // ---------- EXPORT / IMPORT / HERSTEL ----------
   function download(naam, tekst, type) {
     const url = URL.createObjectURL(new Blob([tekst], { type }));
@@ -290,7 +348,7 @@
     try { history.replaceState(null, '', '#' + id); } catch (e) { /* file:// */ }
   };
 
-  window.EDITOR = { editObject, editLening, exportDataJs, importeer, herstel };
+  window.EDITOR = { editObject, editLening, editCrediteur, exportDataJs, importeer, herstel };
 
   // Status in de zijbalk
   if (STORE.heeftWijzigingen()) {

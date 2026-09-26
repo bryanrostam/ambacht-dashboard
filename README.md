@@ -22,7 +22,8 @@ ambacht-dashboard/
 | Menu | Inhoud |
 |---|---|
 | Management | KPI's, actieve meldingen, kasverloop 24 maanden, pipeline |
-| Liquiditeit | Cashflow forecast, tabel 12 maanden, cash per entiteit |
+| Liquiditeit | Cashflow forecast (incl. crediteurbetalingen), tabel 12 maanden, cash per entiteit |
+| ↳ Crediteuren | Alle partijen die betaald moeten worden: status, deadlines, prio, schuifruimte, betaalregelingen, betaalplanning |
 | Portefeuille | Objecten, NOI/LTV, planning & timeline, scenario's & stress testing |
 | Financiering | Leningen, maturity, bouwtranches, covenant monitoring |
 | Waardering | Waardering, value bridge, sensitivity, exit readiness & risico |
@@ -50,6 +51,33 @@ Onderaan de zijbalk (onder *Gegevens*):
 **Wijzigingen voor iedereen vastleggen:** exporteer `data.js`, vervang het bestand in de repository en
 push naar `main`. Daarna ziet iedereen dezelfde data. Klik zelf daarna op *Herstel demo-data*, zodat je
 browser de nieuwe `data.js` gebruikt in plaats van je lokale kopie.
+
+### Crediteuren
+
+Onder **Liquiditeit → Crediteuren** staan alle partijen die betaald moeten worden. Toevoegen via
+**+ Crediteur toevoegen**, wijzigen door op een rij te klikken.
+
+| Veld | Betekenis |
+|---|---|
+| Status | Open · Betaalregeling · Incasso · Faillissementsaanvraag dreigt · Betaald |
+| Deadline | Uiterste betaaldatum. Bij een betaalregeling telt de *volgende termijn* |
+| Prioriteit | Hoog / Middel / Laag |
+| Schuifruimte + max. uitstel | Of (en hoeveel dagen) de betaling kan schuiven |
+| Betaalregeling | Termijnbedrag per maand, volgende termijn, resterende termijnen |
+
+**Wanneer krijg je een melding?** Deadlines worden vergeleken met de datum van *vandaag*.
+
+- **Kritiek (nu betalen):** faillissementsaanvraag dreigt · incasso met deadline ≤ 7 dagen ·
+  niet-schuifbaar en deadline ≤ 7 dagen · deadline ≤ 3 dagen · ook na maximaal uitstel te laat
+- **Aandacht:** deadline ≤ 14 dagen · incasso · over de deadline maar nog binnen de uitstelruimte
+
+Kritieke en aandacht-posten verschijnen ook bij *Actieve meldingen* op het Management-scherm, en het
+aantal kritieke posten staat als rood getal naast *Crediteuren* in het menu. Met **Browsermeldingen
+aanzetten** krijg je maximaal één keer per dag een melding van je browser wanneer je het dashboard opent.
+Een melding terwijl het dashboard dicht is (e-mail/push) vraagt om een server en zit er nog niet in.
+
+Crediteurbetalingen (termijnen van regelingen en openstaande bedragen op de deadline) worden
+meegenomen in de liquiditeitsforecast (kolom *Crediteuren*).
 
 ### Velden voor het Management-scherm
 

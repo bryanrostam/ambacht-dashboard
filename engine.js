@@ -211,6 +211,93 @@ window.ENGINE = (function () {
       .reduce((s, t) => s + Math.abs(t.bedrag) * (t.kans_pct / 100), 0);
   }
 
+  // ---------- CREDITEUREN ----------
+  // Deadlines van crediteuren zijn echte betaaldata: urgentie wordt bepaald t.o.v. VANDAAG.
+  const CRED_STATUS = {
+    open:           { label: 'Open',                     ernst: 1 },
+    betaalregeling: { label: 'Betaalregeling',           ernst: 1 },
+    incasso:        { label: 'Incasso',                  ernst: 2 },
+    faillissement:  { label: 'Faillissementsaanvraag',   ernst: 3 },
+    betaald:        { label: 'Betaald',                  ernst: 0 },
+  };
+  function vandaag() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  function dagenTot(str) {
+    if (!str) return null;
+    const [j, m, d] = parseDatum(str);
+    return Math.round((new Date(j, m, d) - vandaag()) / 86400000);
+  }
+  function crediteuren() {
+    return data().crediteuren || [];
+  }
+  // Eerstvolgende betaalmoment: bij een betaalregeling de volgende termijn, anders de vervaldatum
+  function credDeadline(c) {
+    return c.status === 'betaalregeling' && c.volgende_termijn ? c.volgende_termijn : c.vervaldatum;
+  }
+  function credTeBetalen(c) {
+    if (c.status === 'betaalregeling' && c.termijn_bedrag) return Math.min(c.termijn_bedrag, c.bedrag_open || c.termijn_bedrag);
+    return c.bedrag_open || 0;
+  }
+  // niveau: 'kritiek' (nu betalen) | 'aandacht' | 'ok' | 'betaald'
+  function credUrgentie(c) {
+    if (c.status === 'betaald') return { niveau: 'betaald', dagen: null, score: 9999 };
+    const dagen = dagenTot(credDeadline(c));
+    const d = dagen === null ? 999 : dagen;
+    const schuif = c.schuifruimte || 'nee';
+    const ruimte = schuif === 'ja' ? (c.max_uitstel_dagen || 30) : schuif === 'beperkt' ? (c.max_uitstel_dagen || 7) : 0;
+    let niveau = 'ok';
+    if (c.status === 'faillissement') niveau = 'kritiek';
+    else if (c.status === 'incasso' && d <= 7) niveau = 'kritiek';
+    else if (d + ruimte < 0) niveau = 'kritiek';          // ook na uitstel te laat
+    else if (d <= 7 && schuif === 'nee') niveau = 'kritiek';
+    else if (d <= 3) niveau = 'kritiek';
+    else if (c.status === 'incasso' || d <= 14 || d < 0) niveau = 'aandacht';
+    // Sorteerscore: lager = urgenter
+    const score = (3 - (CRED_STATUS[c.status]?.ernst || 0)) * 1000 + Math.max(-500, Math.min(d, 900)) + (c.prioriteit || 2) * 3;
+    return { niveau, dagen, score };
+  }
+  function crediteurenGesorteerd() {
+    const volgorde = { kritiek: 0, aandacht: 1, ok: 2, betaald: 3 };
+    return crediteuren()
+      .map(c => ({ ...c, urgentie: credUrgentie(c), deadline: credDeadline(c), te_betalen: credTeBetalen(c) }))
+      .sort((a, b) => volgorde[a.urgentie.niveau] - volgorde[b.urgentie.niveau] || a.urgentie.score - b.urgentie.score);
+  }
+  function dagenTekst(dagen) {
+    if (dagen === null) return 'geen deadline';
+    if (dagen < 0) return (-dagen) + (dagen === -1 ? ' dag' : ' dagen') + ' te laat';
+    if (dagen === 0) return 'vandaag';
+    if (dagen === 1) return 'morgen';
+    return 'over ' + dagen + ' dagen';
+  }
+  // Uitgaande betalingen aan crediteuren per maand (YYYY-MM) voor de liquiditeitsforecast
+  function crediteurenPerMaand() {
+    const start = offsetMaand(data().meta.peildatum, 0);
+    const uit = {};
+    const plus = (maand, bedrag) => {
+      const m = maand < start ? start : maand;
+      uit[m] = (uit[m] || 0) + bedrag;
+    };
+    crediteuren().forEach(c => {
+      if (c.status === 'betaald' || !c.bedrag_open) return;
+      if (c.status === 'betaalregeling' && c.termijn_bedrag && c.volgende_termijn) {
+        let rest = c.bedrag_open;
+        const n = c.termijnen_resterend || Math.ceil(rest / c.termijn_bedrag);
+        for (let i = 0; i < n && rest > 0; i++) {
+          const b = Math.min(c.termijn_bedrag, rest);
+          plus(offsetMaand(c.volgende_termijn, i), b);
+          rest -= b;
+        }
+      } else if (c.vervaldatum) {
+        plus(c.vervaldatum.substring(0, 7), c.bedrag_open);
+      } else {
+        plus(start, c.bedrag_open);
+      }
+    });
+    return uit;
+  }
+
   // ---------- ALERTS ----------
   // niveau: 'kritiek' | 'aandacht' | 'info'
   function generateAlerts() {
@@ -274,6 +361,16 @@ window.ENGINE = (function () {
       });
     }
 
+    // Crediteuren die (bijna) betaald moeten worden
+    crediteurenGesorteerd().filter(c => c.urgentie.niveau === 'kritiek' || c.urgentie.niveau === 'aandacht').forEach(c => {
+      const st = c.status === 'faillissement' ? ' Faillissementsaanvraag dreigt.' : c.status === 'incasso' ? ' In incasso.' : c.status === 'betaalregeling' ? ' Termijn betaalregeling.' : '';
+      alerts.push({
+        niveau: c.urgentie.niveau,
+        tekst: `Crediteur ${c.naam}: ${fmt(c.te_betalen)} betalen vóór ${fmtDatum(c.deadline)} (${dagenTekst(c.urgentie.dagen)}).${st}`,
+        bron: 'crediteur',
+      });
+    });
+
     // Info: voortgang bouwprojecten (laatst getrokken tranche)
     data().objecten.filter(o => o.status === 'bouw').forEach(o => {
       const lening = data().leningen.find(l => l.object_id === o.id && l.type === 'bouwfinanciering');
@@ -302,6 +399,7 @@ window.ENGINE = (function () {
 
     let kas = totaleKas();
     const resultaten = [];
+    const credPerMaand = crediteurenPerMaand();
 
     for (let i = 0; i < aantalMaanden; i++) {
       // Indexatie: jaarlijks in januari
@@ -320,8 +418,9 @@ window.ENGINE = (function () {
         return tm === maandStr;
       });
       const incidenteel = events.reduce((s, e) => s + e.bedrag, 0);
+      const crediteuren = credPerMaand[maandStr] || 0;
 
-      const nettoCF = huur - kosten - schulddienst + incidenteel;
+      const nettoCF = huur - kosten - schulddienst + incidenteel - crediteuren;
       const openingKas = kas;
       kas += nettoCF;
 
@@ -334,6 +433,7 @@ window.ENGINE = (function () {
         schulddienst,
         incidenteel,
         events,
+        crediteuren,
         netto_cf: nettoCF,
         sluitend_kas: kas,
         alert: kas < data().meta.minimum_kas_drempel,
@@ -374,6 +474,8 @@ window.ENGINE = (function () {
     fmt, pct, clamp,
     parseDatum, peildatum, fmtDatum, maandJaarLang, maandenTot, offsetMaand,
     portefeuilleIRR,
+    CRED_STATUS, crediteuren, crediteurenGesorteerd, credUrgentie, credDeadline, credTeBetalen,
+    crediteurenPerMaand, dagenTot, dagenTekst, vandaag,
     totaleKas, beschikbareKas, kasPerEntiteit,
     jaarlijkseHuur, maandelijkseHuur,
     jaarlijkseKosten,

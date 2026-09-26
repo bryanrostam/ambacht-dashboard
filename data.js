@@ -432,6 +432,92 @@ window.FORTIS_DATA = {
   ],
 
   // ----------------------------------------------------------
+  //  CREDITEUREN — partijen die we moeten betalen
+  //  status:       "open" | "betaalregeling" | "incasso" | "faillissement" | "betaald"
+  //  prioriteit:   1 = hoog, 2 = middel, 3 = laag
+  //  schuifruimte: "ja" | "beperkt" | "nee"  (+ max_uitstel_dagen)
+  //  vervaldatum:  uiterste betaaldatum (deadline)
+  //  Bij een betaalregeling: termijn_bedrag, volgende_termijn, termijnen_resterend
+  //  Deadlines worden vergeleken met de datum van VANDAAG.
+  // ----------------------------------------------------------
+  crediteuren: [
+    {
+      id: "cr01", naam: "Installatietechniek Brabant BV", categorie: "leverancier",
+      omschrijving: "Installaties Stationsplein 7 — facturen mei/juni", bedrag_open: 62300,
+      status: "faillissement", vervaldatum: "2026-09-30", prioriteit: 1,
+      schuifruimte: "nee", max_uitstel_dagen: 0,
+      contact: "mr. De Groot (advocaat)", entiteit: "EHV Dev BV",
+      notitie: "Advocaat heeft faillissementsaanvraag aangekondigd als er niet vóór 30 sep betaald is.",
+    },
+    {
+      id: "cr02", naam: "Eneco Zakelijk", categorie: "nutsvoorziening",
+      omschrijving: "Energie Coolsingel 88 — Q2", bedrag_open: 7450,
+      status: "incasso", vervaldatum: "2026-10-02", prioriteit: 2,
+      schuifruimte: "nee", max_uitstel_dagen: 0,
+      contact: "GGN Incasso, dossier 2026-44871", entiteit: "RTT Vastgoed BV",
+      notitie: "Incassokosten € 745 al in rekening gebracht.",
+    },
+    {
+      id: "cr03", naam: "Belastingdienst", categorie: "belasting",
+      omschrijving: "BTW Q2 2026", bedrag_open: 48600,
+      status: "betaalregeling", vervaldatum: "2027-03-01", prioriteit: 1,
+      termijn_bedrag: 8100, volgende_termijn: "2026-10-01", termijnen_resterend: 6,
+      schuifruimte: "nee", max_uitstel_dagen: 0,
+      contact: "Invorderingsteam Eindhoven", entiteit: "Fortis Vastgoed BV",
+      notitie: "Bij een gemiste termijn vervalt de regeling en is het volledige bedrag direct opeisbaar.",
+    },
+    {
+      id: "cr04", naam: "VvE Coolsingel 88", categorie: "vve",
+      omschrijving: "Servicekosten Q3/Q4", bedrag_open: 14200,
+      status: "betaalregeling", vervaldatum: "2026-12-05", prioriteit: 2,
+      termijn_bedrag: 4733, volgende_termijn: "2026-10-05", termijnen_resterend: 3,
+      schuifruimte: "beperkt", max_uitstel_dagen: 7,
+      contact: "Beheerder VvE, J. Bakker", entiteit: "RTT Vastgoed BV",
+      notitie: "Termijn kan in overleg een week later.",
+    },
+    {
+      id: "cr05", naam: "Adviesbureau Fiscaal Zuid", categorie: "adviseur",
+      omschrijving: "Fiscaal advies herstructurering", bedrag_open: 9800,
+      status: "open", vervaldatum: "2026-10-10", prioriteit: 3,
+      schuifruimte: "ja", max_uitstel_dagen: 30,
+      contact: "P. Smits", entiteit: "Fortis Vastgoed BV",
+      notitie: "Vaste relatie, uitstel van een maand is eerder akkoord gegeven.",
+    },
+    {
+      id: "cr06", naam: "Bouwbedrijf Van Rijn BV", categorie: "aannemer",
+      omschrijving: "Termijnfactuur 5 — Stationsplein 7", bedrag_open: 186000,
+      status: "open", vervaldatum: "2026-10-15", prioriteit: 1,
+      schuifruimte: "beperkt", max_uitstel_dagen: 14,
+      contact: "H. van Rijn", entiteit: "EHV Dev BV",
+      notitie: "Aannemer legt het werk stil bij meer dan 30 dagen achterstand. Betalen uit tranche 4.",
+    },
+    {
+      id: "cr07", naam: "Gemeente Rotterdam", categorie: "belasting",
+      omschrijving: "OZB 2026 Coolsingel 88", bedrag_open: 22000,
+      status: "open", vervaldatum: "2026-10-31", prioriteit: 2,
+      schuifruimte: "beperkt", max_uitstel_dagen: 30,
+      contact: "Belastingen Rotterdam", entiteit: "RTT Vastgoed BV",
+      notitie: "Uitstel of betalen in termijnen aan te vragen via Mijn Loket.",
+    },
+    {
+      id: "cr08", naam: "Makelaardij Noord", categorie: "adviseur",
+      omschrijving: "Courtage verhuur Markt 15", bedrag_open: 18500,
+      status: "open", vervaldatum: "2026-11-20", prioriteit: 3,
+      schuifruimte: "ja", max_uitstel_dagen: 45,
+      contact: "L. Hoekstra", entiteit: "Fortis Vastgoed BV",
+      notitie: "",
+    },
+    {
+      id: "cr09", naam: "Notariskantoor Van Dijk", categorie: "adviseur",
+      omschrijving: "Akte herfinanciering Leiden", bedrag_open: 0,
+      status: "betaald", vervaldatum: "2026-09-15", prioriteit: 3,
+      schuifruimte: "nee", max_uitstel_dagen: 0,
+      contact: "", entiteit: "Fortis Vastgoed BV",
+      notitie: "Betaald op 12 sep.",
+    },
+  ],
+
+  // ----------------------------------------------------------
   //  EXPLOITATIEKOSTEN per object (jaarlijks)
   // ----------------------------------------------------------
   exploitatiekosten: [

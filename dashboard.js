@@ -32,6 +32,7 @@ function nav(id, el) {
   // Lazy-build charts when page is first visited
   const builders = {
     liq: [buildLiq],
+    crediteuren: [buildCrediteuren],
     portfolio: [buildPortfolio, buildTimeline, buildScenario],
     financiering: [buildFinanciering, buildCovenant],
     valuation: [buildValuation, buildExit],
@@ -184,7 +185,7 @@ function buildLiq() {
   buildLiqChart('base');
 
   // Cashflow table
-  const thead = `<thead><tr><th>Maand</th><th>Huur</th><th>Fin./herfi</th><th>Aankoop/EC</th><th>R+A</th><th>OpEx</th><th>Netto CF</th><th>Kasaldo</th><th></th></tr></thead>`;
+  const thead = `<thead><tr><th>Maand</th><th>Huur</th><th>Fin./herfi</th><th>Aankoop/EC</th><th>R+A</th><th>OpEx</th><th>Crediteuren</th><th>Netto CF</th><th>Kasaldo</th><th></th></tr></thead>`;
   const rows = base.slice(0, 12).map(m => {
     const inc_in = m.incidenteel > 0 ? E.fmt(m.incidenteel) : '—';
     const inc_out = m.incidenteel < 0 ? E.fmt(m.incidenteel) : '—';
@@ -195,6 +196,7 @@ function buildLiq() {
       <td class="num red">${inc_out}</td>
       <td class="num red">${E.fmt(-m.schulddienst)}</td>
       <td class="num red">${E.fmt(-m.kosten)}</td>
+      <td class="num red">${m.crediteuren ? E.fmt(-m.crediteuren) : '—'}</td>
       <td class="num ${m.netto_cf < 0 ? 'red' : 'green'}">${E.fmt(m.netto_cf)}</td>
       <td class="num ${m.sluitend_kas < D.meta.minimum_kas_drempel ? 'red' : m.sluitend_kas < D.meta.minimum_kas_drempel * 2 ? 'amber' : ''}">${E.fmt(m.sluitend_kas)}</td>
       <td>${m.alert ? badge('Alert', 'red') : ''}</td>
@@ -886,3 +888,186 @@ function buildExit() {
     : [alertEl('ok', 'Geen kritieke breekpunten gedetecteerd op basis van huidige data.')]
   ).join('');
 }
+
+
+// ---- CREDITEUREN ----
+const CRED_BADGE = { open: 'blue', betaalregeling: 'purple', incasso: 'amber', faillissement: 'red', betaald: 'gray' };
+const CRED_FILTERS = [
+  { key: 'alle', label: 'Alle', f: c => c.status !== 'betaald' },
+  { key: 'nu', label: 'Nu betalen', f: c => c.urgentie.niveau === 'kritiek' },
+  { key: 'open', label: 'Open', f: c => c.status === 'open' },
+  { key: 'betaalregeling', label: 'Betaalregeling', f: c => c.status === 'betaalregeling' },
+  { key: 'incasso', label: 'Incasso', f: c => c.status === 'incasso' },
+  { key: 'faillissement', label: 'Faillissement', f: c => c.status === 'faillissement' },
+  { key: 'schuifbaar', label: 'Schuifbaar', f: c => c.status !== 'betaald' && c.schuifruimte !== 'nee' },
+  { key: 'betaald', label: 'Betaald', f: c => c.status === 'betaald' },
+];
+let credFilter = 'alle';
+let credC = null;
+
+function buildCrediteuren() {
+  const lijst = E.crediteurenGesorteerd();
+  const actief = lijst.filter(c => c.status !== 'betaald');
+  const som = arr => arr.reduce((s, c) => s + (c.bedrag_open || 0), 0);
+  const nu = actief.filter(c => c.urgentie.niveau === 'kritiek');
+  const binnen14 = actief.filter(c => c.urgentie.dagen !== null && c.urgentie.dagen <= 14);
+  const incasso = actief.filter(c => c.status === 'incasso' || c.status === 'faillissement');
+  const regelingen = actief.filter(c => c.status === 'betaalregeling');
+  const vrijeKas = E.beschikbareKas();
+  const teBetalen14 = binnen14.reduce((s, c) => s + c.te_betalen, 0);
+
+  const vd = E.vandaag();
+  document.getElementById('cred-sub').textContent =
+    `${actief.length} openstaande crediteuren · ${E.fmt(som(actief))} totaal · Stand ${vd.getDate()} ${E.fmtDatum(vd.getFullYear() + '-' + (vd.getMonth() + 1))}`;
+
+  document.getElementById('cred-kpis').innerHTML = [
+    kpi('Totaal openstaand', E.fmt(som(actief)), actief.length + ' partijen', 'kv-red'),
+    kpi('Te betalen ≤ 14 dagen', E.fmt(teBetalen14), `${binnen14.length} betalingen · vrije kas ${E.fmt(vrijeKas)}`, teBetalen14 > vrijeKas ? 'kv-red' : 'kv-amber'),
+    kpi('Incasso / faillissement', String(incasso.length), incasso.length ? E.fmt(som(incasso)) + ' — direct oppakken' : 'Geen', incasso.length ? 'kv-red' : 'kv-green'),
+    kpi('Betaalregelingen', String(regelingen.length), E.fmt(regelingen.reduce((s, c) => s + (c.termijn_bedrag || 0), 0)) + ' per maand', 'kv-blue'),
+  ].join('');
+
+  // Nu betalen
+  const urgent = actief.filter(c => c.urgentie.niveau !== 'ok');
+  document.getElementById('cred-alerts').innerHTML = urgent.length
+    ? urgent.map(c => alertEl(c.urgentie.niveau,
+      `<strong>${esc(c.naam)}</strong> · ${E.fmt(c.te_betalen)} vóór ${E.fmtDatum(c.deadline)} (${E.dagenTekst(c.urgentie.dagen)})` +
+      ` · ${E.CRED_STATUS[c.status].label}${c.schuifruimte === 'nee' ? ' · niet schuifbaar' : c.schuifruimte === 'beperkt' ? ` · max ${c.max_uitstel_dagen || 7} dagen uitstel` : ` · uitstel tot ${c.max_uitstel_dagen || 30} dagen mogelijk`}` +
+      (c.notitie ? `<br><span style="opacity:.85">${esc(c.notitie)}</span>` : ''))).join('')
+    : alertEl('ok', 'Geen betalingen die binnen 14 dagen actie vereisen.');
+
+  // Filters
+  document.getElementById('cred-filter').innerHTML = CRED_FILTERS.map(f =>
+    `<button type="button" class="tab-btn${f.key === credFilter ? ' active-filter' : ''}" onclick="setCredFilter('${f.key}')">${f.label}<span class="cnt">${lijst.filter(f.f).length}</span></button>`).join('');
+  buildCredTabel(lijst);
+
+  // Betaalregelingen
+  document.getElementById('cred-regelingen').innerHTML = regelingen.length ? `
+    <thead><tr><th>Partij</th><th>Termijn</th><th>Volgende</th><th>Termijnen</th><th>Restschuld</th></tr></thead>
+    <tbody>${regelingen.map(c => `<tr class="klikbaar" onclick="EDITOR.editCrediteur('${esc(c.id)}')">
+      <td class="cred-naam">${esc(c.naam)}</td>
+      <td class="num">${E.fmt(c.termijn_bedrag)}/mnd</td>
+      <td class="${c.urgentie.niveau === 'kritiek' ? 'red' : c.urgentie.niveau === 'aandacht' ? 'amber' : ''} td-nowrap">${E.fmtDatum(c.volgende_termijn)}<br><span class="cred-dagen">${E.dagenTekst(c.urgentie.dagen)}</span></td>
+      <td class="num">${c.termijnen_resterend ?? '—'}</td>
+      <td class="num">${E.fmt(c.bedrag_open)}</td>
+    </tr>`).join('')}</tbody>` : '<tbody><tr><td style="color:var(--text-3)">Geen lopende betaalregelingen.</td></tr></tbody>';
+
+  // Schuifruimte
+  const schuifbaar = actief.filter(c => c.schuifruimte && c.schuifruimte !== 'nee' && c.status !== 'faillissement' && c.status !== 'incasso');
+  document.getElementById('cred-schuif').innerHTML = schuifbaar.length ? schuifbaar.map(c => `
+    <div class="schuif-rij">
+      <div><span class="cred-naam">${esc(c.naam)}</span><small>${c.schuifruimte === 'ja' ? 'Schuifbaar' : 'Beperkt schuifbaar'} · max ${c.max_uitstel_dagen || (c.schuifruimte === 'ja' ? 30 : 7)} dagen · deadline ${E.fmtDatum(c.deadline)}</small></div>
+      <div class="num" style="white-space:nowrap">${E.fmt(c.te_betalen)}</div>
+    </div>`).join('') +
+    `<div class="schuif-totaal">Totaal uit te stellen: <strong>${E.fmt(schuifbaar.reduce((s, c) => s + c.te_betalen, 0))}</strong></div>`
+    : '<p style="color:var(--text-3)">Geen posten met schuifruimte.</p>';
+
+  // Betaalplanning per week (12 weken)
+  const weken = Array.from({ length: 12 }, (_, i) => ({ start: new Date(vd.getTime() + i * 7 * 86400000), hard: 0, zacht: 0 }));
+  const achterstallig = { hard: 0, zacht: 0 };
+  actief.forEach(c => {
+    // alle geplande betalingen: bij regeling elke maand een termijn
+    const momenten = [];
+    if (c.status === 'betaalregeling' && c.volgende_termijn && c.termijn_bedrag) {
+      let rest = c.bedrag_open;
+      for (let i = 0; i < (c.termijnen_resterend || 12) && rest > 0; i++) {
+        const [j, m, d] = E.parseDatum(c.volgende_termijn);
+        momenten.push({ datum: new Date(j, m + i, d), bedrag: Math.min(c.termijn_bedrag, rest) });
+        rest -= c.termijn_bedrag;
+      }
+    } else if (c.vervaldatum) {
+      const [j, m, d] = E.parseDatum(c.vervaldatum);
+      momenten.push({ datum: new Date(j, m, d), bedrag: c.bedrag_open });
+    }
+    const soort = c.schuifruimte === 'ja' ? 'zacht' : 'hard';
+    momenten.forEach(mo => {
+      const w = Math.floor((mo.datum - vd) / (7 * 86400000));
+      if (w < 0) achterstallig[soort] += mo.bedrag;
+      else if (w < 12) weken[w][soort] += mo.bedrag;
+    });
+  });
+  weken[0].hard += achterstallig.hard; weken[0].zacht += achterstallig.zacht;
+  const labels = weken.map((w, i) => i === 0 ? 'Deze week' : `${w.start.getDate()} ${E.fmtDatum(w.start.getFullYear() + '-' + (w.start.getMonth() + 1)).split(' ')[0]}`);
+  let cum = 0;
+  const cumulatief = weken.map(w => (cum += w.hard + w.zacht));
+  if (credC) credC.destroy();
+  credC = new Chart(document.getElementById('credChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Niet schuifbaar', data: weken.map(w => w.hard), backgroundColor: 'rgba(240,133,122,0.75)', borderRadius: 3, stack: 'b' },
+      { label: 'Schuifbaar', data: weken.map(w => w.zacht), backgroundColor: 'rgba(232,182,74,0.7)', borderRadius: 3, stack: 'b' },
+      { type: 'line', label: 'Cumulatief', stack: 'cum', data: cumulatief, borderColor: '#6fa8ee', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: true, labels: { boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } },
+      scales: { x: { stacked: true, ticks: { font: { size: 11 } }, grid: { display: false } }, y: { stacked: true, ticks: { font: { size: 11 }, callback: v => E.fmt(v) } } } },
+  });
+}
+
+function buildCredTabel(lijst) {
+  const filter = CRED_FILTERS.find(f => f.key === credFilter) || CRED_FILTERS[0];
+  const rijen = lijst.filter(filter.f);
+  const prioTxt = { 1: 'Hoog', 2: 'Middel', 3: 'Laag' };
+  document.getElementById('cred-tbl').innerHTML = `
+    <thead><tr><th>Partij</th><th>Status</th><th>Openstaand</th><th>Nu te betalen</th><th>Deadline</th><th>Prio</th><th>Schuifruimte</th><th>Entiteit</th><th></th></tr></thead>
+    <tbody>${rijen.length ? rijen.map(c => {
+      const u = c.urgentie;
+      const kl = u.niveau === 'kritiek' ? 'red' : u.niveau === 'aandacht' ? 'amber' : '';
+      return `<tr class="klikbaar urg-${u.niveau}" onclick="EDITOR.editCrediteur('${esc(c.id)}')">
+        <td><div class="cred-naam">${esc(c.naam)}</div><div class="cred-oms">${esc(c.omschrijving || c.categorie || '')}</div></td>
+        <td>${badge(E.CRED_STATUS[c.status]?.label || c.status, CRED_BADGE[c.status] || 'gray')}</td>
+        <td class="num">${E.fmt(c.bedrag_open)}</td>
+        <td class="num ${kl}">${c.status === 'betaald' ? '—' : E.fmt(c.te_betalen)}</td>
+        <td class="${kl} td-nowrap">${E.fmtDatum(c.deadline)}${c.status !== 'betaald' ? `<br><span class="cred-dagen">${E.dagenTekst(u.dagen)}</span>` : ''}</td>
+        <td><span class="prio prio-${c.prioriteit || 2}">${prioTxt[c.prioriteit || 2]}</span></td>
+        <td>${c.schuifruimte === 'ja' ? badge('Ja · ' + (c.max_uitstel_dagen || 30) + 'd', 'green') : c.schuifruimte === 'beperkt' ? badge('Beperkt · ' + (c.max_uitstel_dagen || 7) + 'd', 'amber') : badge('Nee', 'red')}</td>
+        <td class="cred-oms">${esc(c.entiteit || '—')}</td>
+        <td class="row-actions"><button type="button" class="icon-btn" title="Wijzigen" aria-label="Wijzigen">✎</button></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="9" style="color:var(--text-3)">Geen crediteuren in deze selectie.</td></tr>'}</tbody>`;
+}
+
+function setCredFilter(key) {
+  credFilter = key;
+  buildCrediteuren();
+}
+
+// Meldingen: teller in de zijbalk + (optioneel) browsermelding, max. 1x per dag
+window.CRED = (function () {
+  function urgent() {
+    return E.crediteurenGesorteerd().filter(c => c.urgentie.niveau === 'kritiek');
+  }
+  function toonMelding(force) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const lijst = urgent();
+    if (!lijst.length) return;
+    const key = 'cred_melding_' + new Date().toISOString().slice(0, 10);
+    try { if (!force && localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { /* niets */ }
+    const totaal = lijst.reduce((s, c) => s + c.te_betalen, 0);
+    new Notification(`${lijst.length} betaling${lijst.length > 1 ? 'en' : ''} vereist actie (${E.fmt(totaal)})`, {
+      body: lijst.slice(0, 4).map(c => `${c.naam}: ${E.fmt(c.te_betalen)} — ${E.dagenTekst(c.urgentie.dagen)}`).join('\n'),
+      tag: 'crediteuren',
+    });
+  }
+  function meldingenAan() {
+    if (!('Notification' in window)) { alert('Deze browser ondersteunt geen meldingen.'); return; }
+    Notification.requestPermission().then(p => {
+      knop();
+      if (p === 'granted') toonMelding(true);
+      else alert('Meldingen zijn geblokkeerd. Sta ze toe via het slotje naast het webadres.');
+    });
+  }
+  function knop() {
+    const b = document.getElementById('cred-notif-btn');
+    if (!b) return;
+    if (!('Notification' in window)) { b.hidden = true; return; }
+    if (Notification.permission === 'granted') { b.textContent = 'Browsermeldingen staan aan'; b.disabled = true; }
+  }
+  // Teller in de zijbalk
+  const n = urgent().length;
+  const tel = document.getElementById('nav-cred-count');
+  if (tel && n) { tel.textContent = n; tel.hidden = false; }
+  knop();
+  toonMelding(false);
+  return { meldingenAan };
+})();

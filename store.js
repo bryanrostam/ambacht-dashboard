@@ -10,7 +10,7 @@
 
 window.STORE = (function () {
   const KEY = 'portfolio_dashboard_data_v1';
-  const VELDEN = ['objecten', 'huurcontracten', 'exploitatiekosten', 'leningen'];
+  const VELDEN = ['objecten', 'huurcontracten', 'exploitatiekosten', 'leningen', 'crediteuren'];
   const D = window.FORTIS_DATA;
 
   // Tekst ontdoen van HTML-tekens, zodat ingevoerde namen nooit als HTML worden uitgevoerd

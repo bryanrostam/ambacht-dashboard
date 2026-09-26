@@ -621,3 +621,41 @@ input[type=range] {
 @media (max-width: 900px) {
   .sb-data { display: none; }
 }
+
+/* ============================================================
+   CREDITEUREN
+   ============================================================ */
+.nav-item.nav-sub { padding-top: 10px; padding-bottom: 10px; padding-left: 52px; font-size: 15px; color: var(--text-2); }
+.nav-item.nav-sub.active { color: var(--text-1); }
+.nav-count {
+  margin-left: auto;
+  background: var(--red-bg); color: var(--red-text);
+  font-size: 12px; font-weight: 700;
+  border-radius: 10px; padding: 1px 8px;
+}
+.tabs-small .tab-btn { padding: 6px 14px; font-size: 13.5px; border-radius: 8px; }
+.tab-btn.active-filter { background: var(--bg-3); border-color: var(--text-3); }
+.tab-btn .cnt { opacity: 0.65; margin-left: 4px; }
+
+.cred-naam { font-weight: 600; }
+.cred-oms { font-size: 12.5px; color: var(--text-3); }
+.cred-dagen { font-size: 12px; font-weight: 600; }
+.urg-kritiek td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+.urg-aandacht td:first-child { box-shadow: inset 3px 0 0 var(--amber); }
+.tbl tr.urg-betaald td { opacity: 0.5; }
+.prio { font-weight: 700; font-size: 12px; }
+.prio-1 { color: var(--red); } .prio-2 { color: var(--amber); } .prio-3 { color: var(--text-3); }
+
+.schuif-rij { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.schuif-rij:last-child { border-bottom: none; }
+.schuif-rij small { display: block; color: var(--text-3); font-size: 12px; }
+.schuif-totaal { margin-top: 10px; font-size: 13.5px; color: var(--text-2); }
+.schuif-totaal strong { color: var(--green); }
+.f-veld.f-breed { grid-column: 1 / -1; }
+.modal textarea {
+  font-family: inherit; font-size: 14px; background: var(--bg-card); color: var(--text-1);
+  border: 1px solid var(--border-2); border-radius: 7px; padding: 8px 10px; width: 100%; min-height: 70px; resize: vertical;
+}
+@media (max-width: 900px) { .nav-item.nav-sub { padding-left: 0; } .nav-count { display: none; } }
+.tbl td.td-nowrap { white-space: nowrap; }
+#cred-regelingen td, #cred-regelingen th { padding-left: 8px; padding-right: 8px; }
