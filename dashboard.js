@@ -10,9 +10,11 @@ const E = window.ENGINE;
 const D = window.FORTIS_DATA;
 const MND = E.maandLabels(24);
 
-// ---- CHART.JS — DONKER THEMA ----
-Chart.defaults.color = '#9b9b9b';
-Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+// ---- CHART.JS — THEMA ----
+const LICHT = document.documentElement.dataset.theme === 'light';
+const GRID = LICHT ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)';
+Chart.defaults.color = LICHT ? '#6b6b65' : '#9b9b9b';
+Chart.defaults.borderColor = GRID;
 Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif";
 Chart.defaults.plugins.tooltip.backgroundColor = '#111';
 Chart.defaults.plugins.tooltip.borderColor = 'rgba(255,255,255,0.12)';
@@ -232,7 +234,7 @@ function buildLiqChart(scen) {
       { label: 'Kasverloop', data: selected, borderColor: col, backgroundColor: col + '1f', borderWidth: 2, fill: true, tension: 0.35, pointRadius: 2 },
       { label: 'Min. drempel', data: thresh, borderColor: '#f0857a', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0 },
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 10 }, maxTicksLimit: 10 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => E.fmt(v) }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 10 }, maxTicksLimit: 10 }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => E.fmt(v) }, grid: { color: GRID } } } },
   });
 }
 function setLiqScen(s, btn) {
@@ -282,14 +284,14 @@ function buildPortfolio() {
   new Chart(document.getElementById('noiChart'), {
     type: 'bar',
     data: { labels: verhuurde.map(o => o.naam.split(' ')[0]), datasets: [{ data: verhuurde.map(o => Math.round(o.noi / 1000)), backgroundColor: '#6fa8ee', borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => v + 'k' }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => v + 'k' }, grid: { color: GRID } } } },
   });
 
   const metLTV = ltvs.filter(o => o.ltv !== null);
   new Chart(document.getElementById('ltvChart'), {
     type: 'bar',
     data: { labels: metLTV.map(o => o.naam.split(' ')[0]), datasets: [{ data: metLTV.map(o => Math.round(o.ltv)), backgroundColor: metLTV.map(o => o.ltv > 70 ? '#F09595' : o.ltv > 60 ? '#FAC775' : '#97C459'), borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, }, grid: { display: false } }, y: { min: 0, max: 90, ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, }, grid: { display: false } }, y: { min: 0, max: 90, ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: GRID } } } },
   });
 }
 
@@ -371,7 +373,7 @@ function buildTimeline() {
       { type: 'line', label: 'Kasverloop', data: kas, borderColor: '#6fa8ee', borderWidth: 2.5, fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
       { type: 'line', label: 'Min. drempel', data: new Array(24).fill(D.meta.minimum_kas_drempel), borderColor: '#f0857a', borderWidth: 1, borderDash: [3, 3], fill: false, pointRadius: 0, yAxisID: 'y' },
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 9 }, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: { font: { size: 9 }, callback: v => E.fmt(v) }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': ' + E.fmt(ctx.parsed.y) } } }, scales: { x: { ticks: { font: { size: 9 }, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: { font: { size: 9 }, callback: v => E.fmt(v) }, grid: { color: GRID } } } },
   });
 
   document.getElementById('tl-kpis').innerHTML = [
@@ -531,7 +533,7 @@ function buildFinanciering() {
   new Chart(document.getElementById('matChart'), {
     type: 'bar',
     data: { labels: jaarLabels, datasets: [{ data: jaarLabels.map(j => Math.round(jaren[j] / 1e6 * 10) / 10), backgroundColor: jaarLabels.map(j => parseInt(j) <= nu.getFullYear() + 1 ? '#f0857a' : parseInt(j) <= nu.getFullYear() + 2 ? '#e8b64a' : '#6fa8ee'), borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y + 'M' } } }, scales: { x: { ticks: { font: { size: 11 }, }, grid: { display: false } }, y: { ticks: { font: { size: 11 }, callback: v => '€' + v + 'M' }, grid: { color: 'rgba(255,255,255,0.06)' } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y + 'M' } } }, scales: { x: { ticks: { font: { size: 11 }, }, grid: { display: false } }, y: { ticks: { font: { size: 11 }, callback: v => '€' + v + 'M' }, grid: { color: GRID } } } },
   });
 
   // Tranches
@@ -704,7 +706,7 @@ function recalcVal() {
   impC = new Chart(document.getElementById('impactChart'), {
     type: 'bar',
     data: { labels: impacts.map(s => s.l), datasets: [{ data: impacts.map(s => Math.round(s.v / 1e6 * 100) / 100), backgroundColor: impacts.map(s => s.c), borderRadius: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + Math.abs(ctx.parsed.x).toFixed(2) + 'M equity' } } }, scales: { x: { ticks: { font: { size: 10 }, callback: v => '€' + v + 'M' }, grid: { color: 'rgba(255,255,255,0.06)' } }, y: { ticks: { font: { size: 11 }, }, grid: { display: false } } } },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + Math.abs(ctx.parsed.x).toFixed(2) + 'M equity' } } }, scales: { x: { ticks: { font: { size: 10 }, callback: v => '€' + v + 'M' }, grid: { color: GRID } }, y: { ticks: { font: { size: 11 }, }, grid: { display: false } } } },
   });
 }
 
@@ -1067,6 +1069,8 @@ window.CRED = (function () {
   const n = urgent().length;
   const tel = document.getElementById('nav-cred-count');
   if (tel && n) { tel.textContent = n; tel.hidden = false; }
+  const dot = document.getElementById('nav-cred-dot');
+  if (dot && n) dot.hidden = false;
   knop();
   toonMelding(false);
   return { meldingenAan };

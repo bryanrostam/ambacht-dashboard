@@ -19,6 +19,14 @@ ambacht-dashboard/
 └── README.md       ← Dit bestand
 ```
 
+### Bovenbalk, accountmenu en zijbalk
+
+- **Zijbalk:** een smalle iconenbalk die bij hover uitklapt met de namen. Via de knop onderaan
+  (*Zijbalk*) kies je: *Uitklappen bij hover*, *Altijd uitgeklapt* of *Ingeklapt*.
+- **Accountmenu** (rondje rechtsboven): profiel (naam/e-mail), changelog, pagina afdrukken,
+  thema (*Systeem*, *Donker*, *Licht*), tijdzone en de gegevensknoppen (exporteren, importeren, herstellen).
+- Profiel en voorkeuren worden in je browser bewaard. Er is (nog) geen echte login.
+
 ### Navigatie
 
 | Menu | Inhoud |
@@ -42,7 +50,7 @@ ambacht-dashboard/
 **Waar worden wijzigingen bewaard?** In je browser (localStorage). Ze zijn dus alleen zichtbaar
 op dit apparaat en in deze browser, en verdwijnen als je browsergegevens wist of een privévenster gebruikt.
 
-Onderaan de zijbalk (onder *Gegevens*):
+In het accountmenu rechtsboven (onder *Gegevens*):
 
 | Knop | Wat het doet |
 |---|---|
@@ -51,7 +59,7 @@ Onderaan de zijbalk (onder *Gegevens*):
 | Herstel demo-data | Wist je wijzigingen in deze browser en gaat terug naar `data.js` |
 
 **Wijzigingen voor iedereen vastleggen:** exporteer `data.js`, vervang het bestand in de repository en
-push naar `main`. Daarna ziet iedereen dezelfde data. Klik zelf daarna op *Herstel demo-data*, zodat je
+push naar `main`. Daarna ziet iedereen dezelfde data. Klik daarna in het accountmenu op *Herstel demo-data*, zodat je
 browser de nieuwe `data.js` gebruikt in plaats van je lokale kopie.
 
 ### Leningovereenkomst uploaden (AI)

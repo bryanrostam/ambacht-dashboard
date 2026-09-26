@@ -481,7 +481,7 @@
     try { history.replaceState(null, '', '#' + id); } catch (e) { /* file:// */ }
   };
 
-  window.EDITOR = { editObject, editLening, editCrediteur, exportDataJs, importeer, herstel };
+  window.EDITOR = { editObject, editLening, editCrediteur, exportDataJs, importeer, herstel, openModal };
 
   // Status in de zijbalk
   if (STORE.heeftWijzigingen()) {
