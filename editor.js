@@ -243,13 +243,146 @@
   function editLening(id) {
     const l = id ? D.leningen.find(x => x.id === id) : { type: 'hypotheek', rente_type: 'vast', aflossing_type: 'annuiteit', ingangsdatum: D.meta.peildatum };
     if (!l) return;
-    const body = `<div class="f-grid">${LENING_VELDEN.map(f => veldHtml(f, l[f.key])).join('')}</div>`;
-    openModal(id ? 'Lening wijzigen' : 'Lening toevoegen', body, f => {
+    const body = `
+      <div class="ai-upload" id="ai-upload">
+        <input type="file" id="ai-bestand" accept="application/pdf,image/jpeg,image/png,image/webp" hidden>
+        <div class="ai-upload-tekst">
+          <strong>Leningovereenkomst uploaden</strong>
+          <span>PDF, JPG of PNG (max. 3 MB). AI vult de velden in; jij controleert en slaat op.</span>
+        </div>
+        <button type="button" class="btn btn-small" id="ai-kies">Document kiezen</button>
+      </div>
+      <div id="ai-status"></div>
+      <div class="f-grid">${LENING_VELDEN.map(f => veldHtml(f, l[f.key])).join('')}</div>
+      <div id="ai-opmerkingen"></div>`;
+    const form = openModal(id ? 'Lening wijzigen' : 'Lening toevoegen', body, f => {
       const nieuw = leesVelden(f, LENING_VELDEN, id ? l : {});
       if (nieuw.hoofdsom == null) nieuw.hoofdsom = nieuw.huidig_saldo;
       if (!id) { nieuw.id = STORE.nieuwId('ln'); D.leningen.push(nieuw); }
       opslaanEnHerladen();
     }, id ? () => deleteLening(id) : null);
+    koppelAiUpload(form);
+  }
+
+  // ---------- AI: LENINGOVEREENKOMST UITLEZEN ----------
+  const MAX_BESTAND = 3 * 1024 * 1024;
+  const ZEKERHEID_TXT = { hoog: 'AI · zeker', middel: 'AI · controleren', laag: 'AI · onzeker' };
+
+  function leesAlsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1]);
+      r.onerror = () => reject(new Error('Bestand kon niet worden gelezen.'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  // Onderpand-tekst koppelen aan een bestaand object (op naam of stad)
+  function zoekObject(onderpand) {
+    if (!onderpand) return null;
+    const t = onderpand.toLowerCase();
+    return D.objecten.find(o => o.naam && t.includes(o.naam.toLowerCase()))
+      || D.objecten.find(o => o.stad && t.includes(o.stad.toLowerCase()))
+      || null;
+  }
+
+  function markeer(form, key, info, weergave) {
+    const el = form.elements[key];
+    if (!el) return;
+    const label = el.closest('.f-veld');
+    label.classList.remove('ai-hoog', 'ai-middel', 'ai-laag');
+    label.classList.add('ai-' + info.zekerheid);
+    let tag = label.querySelector('.ai-tag');
+    if (!tag) {
+      tag = document.createElement('small');
+      tag.className = 'ai-tag';
+      label.appendChild(tag);
+    }
+    tag.textContent = ZEKERHEID_TXT[info.zekerheid] + (info.bron ? ' — "' + info.bron.slice(0, 140) + (info.bron.length > 140 ? '…"' : '"') : '') + (weergave || '');
+    const wis = () => { label.classList.remove('ai-hoog', 'ai-middel', 'ai-laag'); tag.remove(); el.removeEventListener('input', wis); };
+    el.addEventListener('input', wis);
+  }
+
+  function vulFormulier(form, resultaat) {
+    const v = resultaat.velden || {};
+    let gevuld = 0, onzeker = 0;
+    LENING_VELDEN.filter(f => f.key && f.key !== 'object_id').forEach(f => {
+      const info = v[f.key];
+      if (!info || info.waarde === null || info.waarde === undefined || info.waarde === '') return;
+      const el = form.elements[f.key];
+      if (f.type === 'select' && !f.opties.includes(info.waarde)) return;
+      el.value = info.waarde;
+      markeer(form, f.key, info);
+      gevuld++;
+      if (info.zekerheid !== 'hoog') onzeker++;
+    });
+    // Object koppelen via het onderpand
+    const onderpand = v.onderpand && v.onderpand.waarde;
+    if (onderpand) {
+      const obj = zoekObject(onderpand);
+      if (obj) {
+        form.elements.object_id.value = obj.id;
+        markeer(form, 'object_id', { zekerheid: 'middel', bron: onderpand });
+      } else {
+        markeer(form, 'object_id', { zekerheid: 'laag', bron: onderpand }, ' · geen passend object gevonden, kies zelf');
+      }
+      gevuld++;
+    }
+    const opm = (resultaat.opmerkingen || []).filter(Boolean);
+    form.querySelector('#ai-opmerkingen').innerHTML = opm.length
+      ? `<div class="f-groep">Overige bepalingen uit het document</div><ul class="ai-opm">${opm.map(o => `<li>${esc(o)}</li>`).join('')}</ul>`
+      : '';
+    return { gevuld, onzeker };
+  }
+
+  function koppelAiUpload(form) {
+    const input = form.querySelector('#ai-bestand');
+    const zone = form.querySelector('#ai-upload');
+    const status = form.querySelector('#ai-status');
+    const zet = (niveau, html) => status.innerHTML = html ? `<div class="alert alert-${niveau} ai-melding"><div>${html}</div></div>` : "";
+    const opslaanKnop = form.querySelector('button[type=submit]');
+
+    async function verwerk(file) {
+      if (!file) return;
+      const type = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : '');
+      if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+        zet('red', 'Kies een PDF, JPG, PNG of WEBP-bestand.'); return;
+      }
+      if (file.size > MAX_BESTAND) {
+        zet('red', `Het bestand is ${(file.size / 1048576).toFixed(1).replace('.', ',')} MB; de limiet is 3 MB. Comprimeer de PDF of upload alleen de relevante pagina's.`); return;
+      }
+      zone.classList.add('bezig');
+      opslaanKnop.disabled = true;
+      zet('blue', `<span class="spinner"></span> <strong>${esc(file.name)}</strong> wordt gelezen… dit duurt meestal 20–60 seconden.`);
+      try {
+        const bestand = await leesAlsBase64(file);
+        const resp = await fetch('api/lening-uitlezen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bestand, mediaType: type }),
+        });
+        let data = null;
+        try { data = await resp.json(); } catch (e) { /* geen JSON */ }
+        if (!resp.ok) throw new Error((data && data.fout) || (resp.status === 404
+          ? 'De AI-functie is niet bereikbaar. Die werkt alleen op de online (Vercel) versie van het dashboard.'
+          : 'Uitlezen mislukt (' + resp.status + ').'));
+        const { gevuld, onzeker } = vulFormulier(form, data);
+        if (!gevuld) zet('amber', 'Er zijn geen leninggegevens in het document gevonden. Vul de velden handmatig in.');
+        else zet('green', `<strong>${gevuld} velden ingevuld.</strong> Controleer alle gemarkeerde velden${onzeker ? ` — vooral de ${onzeker} gele/rode` : ''} — en klik daarna op Opslaan. Er wordt niets opgeslagen zonder jouw bevestiging.`);
+      } catch (err) {
+        zet('red', esc(err.message || 'Uitlezen mislukt.') + ' Je kunt de velden ook handmatig invullen.');
+      } finally {
+        zone.classList.remove('bezig');
+        opslaanKnop.disabled = false;
+        input.value = '';
+      }
+    }
+
+    form.querySelector('#ai-kies').onclick = () => input.click();
+    input.onchange = () => verwerk(input.files[0]);
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('sleep'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('sleep'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('sleep'); verwerk(e.dataTransfer.files[0]); });
   }
 
   function deleteLening(id) {

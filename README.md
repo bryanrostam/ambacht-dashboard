@@ -13,7 +13,9 @@ ambacht-dashboard/
 ├── store.js        ← Bewaart wijzigingen uit het dashboard in je browser
 ├── engine.js       ← Alle berekeningen (niet aanpassen)
 ├── dashboard.js    ← Alle views (niet aanpassen)
-├── editor.js       ← Formulieren om objecten en leningen te beheren
+├── editor.js       ← Formulieren om objecten, leningen en crediteuren te beheren
+├── api/lening-uitlezen.js ← Serverfunctie (Vercel): leningovereenkomst uitlezen met AI
+├── package.json / vercel.json ← Instellingen voor die serverfunctie
 └── README.md       ← Dit bestand
 ```
 
@@ -51,6 +53,26 @@ Onderaan de zijbalk (onder *Gegevens*):
 **Wijzigingen voor iedereen vastleggen:** exporteer `data.js`, vervang het bestand in de repository en
 push naar `main`. Daarna ziet iedereen dezelfde data. Klik zelf daarna op *Herstel demo-data*, zodat je
 browser de nieuwe `data.js` gebruikt in plaats van je lokale kopie.
+
+### Leningovereenkomst uploaden (AI)
+
+In het formulier **Lening toevoegen / wijzigen** staat bovenaan *Leningovereenkomst uploaden*
+(PDF, JPG of PNG, max. 3 MB; slepen kan ook). De AI (Claude) leest het document en vult de velden in:
+
+- **Groen** = letterlijk gevonden · **Geel** = controleren · **Rood** = onzeker of afgeleid
+- Onder elk veld staat de passage uit het document waar de waarde vandaan komt
+- Het object wordt gekoppeld via het adres van het onderpand; overige bepalingen (ICR, boeterente,
+  rentevastperiode, zekerheden) verschijnen onderaan het formulier
+- Er wordt **niets opgeslagen** tot je zelf op *Opslaan* klikt. Het document zelf wordt nergens bewaard.
+
+**Eenmalig instellen (verplicht):**
+1. Maak een API-sleutel aan op https://console.anthropic.com (Settings → API keys) en zet er tegoed op.
+2. Vercel → je project → *Settings → Environment Variables* → voeg `ANTHROPIC_API_KEY` toe met die sleutel
+   (Production én Preview).
+3. Deploy opnieuw (Deployments → ⋯ → *Redeploy*), anders is de sleutel nog niet actief.
+
+Kosten: ongeveer € 0,05–0,30 per document, afhankelijk van het aantal pagina's.
+De functie werkt alleen op de online Vercel-versie, niet als je `index.html` lokaal opent.
 
 ### Crediteuren
 
