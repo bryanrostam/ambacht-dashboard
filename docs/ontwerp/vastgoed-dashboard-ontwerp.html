@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Vastgoed Portfolio Dashboard — Functioneel Ontwerp</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  :root { --ink:#1b2430; --muted:#5b6675; --line:#d9dee5; --head:#1a3a5c; --soft:#f3f6f9;
+          --red:#b42318; --redbg:#fdecea; --amber:#9a6700; --amberbg:#fff6db; --green:#1a7f37; --greenbg:#e8f5ec; --blue:#1a5fa8; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 9.6pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 24pt; color: var(--head); margin: 0 0 4mm; line-height: 1.15; }
+  h2 { font-size: 15pt; color: var(--head); border-bottom: 2px solid var(--head); padding-bottom: 1.5mm; margin: 0 0 4mm; break-after: avoid; }
+  h3 { font-size: 11.5pt; color: var(--head); margin: 5mm 0 2mm; break-after: avoid; }
+  h4 { font-size: 10pt; margin: 4mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  section { break-before: page; }
+  table { width: 100%; border-collapse: collapse; margin: 1mm 0 4mm; font-size: 8.6pt; table-layout: auto; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th { background: var(--head); color: #fff; text-align: left; font-weight: 600; padding: 1.6mm 2mm; }
+  td { border-bottom: 1px solid var(--line); padding: 1.4mm 2mm; vertical-align: top; }
+  tbody tr:nth-child(even) td { background: var(--soft); }
+  td code, p code, li code { font-family: Menlo, Consolas, monospace; font-size: 8pt; background: #eef1f5; padding: 0 1mm; border-radius: 2px; }
+  td:first-child code { background: none; padding: 0; font-weight: 600; color: var(--head); }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+  .cover .kicker { text-transform: uppercase; letter-spacing: .12em; color: var(--blue); font-weight: 700; font-size: 9pt; margin-bottom: 4mm; }
+  .cover .sub { font-size: 12pt; color: var(--muted); max-width: 150mm; }
+  .cover .meta { margin-top: 14mm; font-size: 9pt; color: var(--muted); border-top: 1px solid var(--line); padding-top: 4mm; }
+  .toc ol { font-size: 10.5pt; line-height: 1.8; }
+  .box { border: 1px solid var(--line); border-left: 4px solid var(--blue); background: var(--soft); padding: 3mm 4mm; margin: 2mm 0 4mm; break-inside: avoid; }
+  .formula { font-family: Menlo, Consolas, monospace; font-size: 8.4pt; background: #eef1f5; border-radius: 3px; padding: 2.5mm 3mm; margin: 1.5mm 0 3mm; white-space: pre-wrap; break-inside: avoid; }
+  .alert { border-radius: 3px; padding: 2mm 3mm; margin: 0 0 2mm; break-inside: avoid; }
+  .alert b { margin-right: 1mm; }
+  .crit { background: var(--redbg); color: var(--red); }
+  .warn { background: var(--amberbg); color: var(--amber); }
+  .info { background: var(--greenbg); color: var(--green); }
+  .tag { display: inline-block; font-size: 7.6pt; font-weight: 700; padding: .3mm 1.6mm; border-radius: 2mm; }
+  .tag.crit, .tag.warn, .tag.info { margin: 0; }
+  /* Mockup: plain block layout, no nested tables */
+  .mock { border: 1px solid #2c3440; background: #161b22; color: #e6edf3; border-radius: 3mm; padding: 4mm; margin: 2mm 0 4mm; break-inside: avoid; font-size: 8.2pt; }
+  .mock .mt { font-weight: 700; font-size: 10.5pt; }
+  .mock .ms { color: #9aa5b1; margin-bottom: 3mm; }
+  .mock .filters { margin-bottom: 3mm; }
+  .mock .chip { display: inline-block; border: 1px solid #3a4452; border-radius: 1.5mm; padding: .6mm 2mm; margin: 0 1mm 1mm 0; color: #c9d1d9; }
+  .mock .chip.on { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .mock .kpis { display: flex; gap: 2mm; margin-bottom: 3mm; }
+  .mock .kpi { flex: 1; background: #21262d; border-radius: 2mm; padding: 2mm; }
+  .mock .kl { color: #9aa5b1; font-size: 7.4pt; }
+  .mock .kv { font-size: 12pt; font-weight: 700; margin: .5mm 0; }
+  .mock .kd { color: #9aa5b1; font-size: 7.2pt; }
+  .g { color: #56d364; } .r { color: #ff7b72; } .a { color: #e3b341; } .b { color: #79c0ff; }
+  .mock .ma { border-radius: 1.5mm; padding: 1.4mm 2mm; margin-bottom: 1.2mm; }
+  .mock .ma.crit { background: #4a1f1f; color: #ffb4ab; }
+  .mock .ma.warn { background: #4a3a12; color: #f2cc60; }
+  .mock .ma.info { background: #173a22; color: #7ee787; }
+  .bars { display: flex; align-items: flex-end; gap: 1mm; height: 22mm; margin-top: 2mm; border-bottom: 1px solid #3a4452; }
+  .bars div { flex: 1; background: #388bfd; border-radius: .6mm .6mm 0 0; }
+  .bars div.low { background: #f85149; }
+  .bars div.mid { background: #d29922; }
+  .barlbl { display: flex; gap: 1mm; font-size: 6.4pt; color: #9aa5b1; }
+  .barlbl span { flex: 1; text-align: center; }
+  .flow { display: flex; gap: 2mm; align-items: stretch; margin: 2mm 0 4mm; break-inside: avoid; }
+  .flow .step { flex: 1; border: 1px solid var(--line); border-top: 4px solid var(--blue); border-radius: 2mm; padding: 2.5mm; background: #fff; }
+  .flow .step b { display: block; color: var(--head); margin-bottom: 1mm; }
+  .flow .arrow { align-self: center; color: var(--muted); font-size: 14pt; }
+  .two { display: flex; gap: 4mm; }
+  .two > div { flex: 1; }
+  .small { font-size: 8.2pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="kicker">Functioneel ontwerp · Versie 1.0</div>
+  <h1>Vastgoed Portfolio Dashboard<br>&amp; Forecast Engine</h1>
+  <p class="sub">Liquiditeitssturing, timing van cash events, scenario's, financiering, rendement en waardering voor een vastgoedportefeuille met objecten in eigendom, ontwikkeling, bouw, acquisitie en (her)financiering.</p>
+  <div class="meta">
+    Perspectief: senior vastgoed-CFO · financial modeller · product architect<br>
+    Datum: september 2026 · Alle bedragen in euro, excl. btw tenzij anders vermeld
+  </div>
+</div>
+
+<section class="toc">
+  <h2>Inhoud</h2>
+  <ol>
+    <li>Businessdoelen van het systeem</li>
+    <li>Functioneel model</li>
+    <li>Entiteiten en tabellen</li>
+    <li>Velden per entiteit</li>
+    <li>Business rules</li>
+    <li>Forecast engine (maandbasis, 24–36 maanden)</li>
+    <li>Scenario engine (base, upside, downside)</li>
+    <li>KPI-lijst</li>
+    <li>Dashboard views per doelgroep</li>
+    <li>MVP-scope versie 1</li>
+    <li>Roadmap versie 2 en 3</li>
+    <li>Technische architectuur</li>
+  </ol>
+  <p style="margin-left:5mm">Bijlage A — Module crediteuren &amp; betaalregelingen<br>Bijlage B — Alertcatalogus</p>
+  <div class="box">
+    <b>Leesregel.</b> Het ontwerp is bewust gelaagd: eerst <b>liquiditeit en timing van cash events</b> (MVP), daarna rendement, waarde en indexatie (versie 2), daarna integraties en automatisering (versie 3).
+  </div>
+</section>
+
+<!-- 1 -->
+<section>
+  <h2>1. Businessdoelen van het systeem</h2>
+  <table>
+    <thead><tr><th style="width:14%">Prioriteit</th><th style="width:26%">Doel</th><th>Concrete uitkomst</th><th style="width:24%">Meetbaar als</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag crit">1 · Primair</span></td><td><b>Liquiditeitsbeheersing</b></td><td>Elke maand 24 maanden vooruit zien welke cash events eraan komen (aankoop, eigen inbreng, tranches, rente, aflossing, herfinanciering, verkoop) en tijdig waarschuwen bij een dreigend tekort.</td><td>Geen onverwacht kastekort; tekort minimaal 6 maanden vooraf gesignaleerd.</td></tr>
+      <tr><td><span class="tag warn">2 · Secundair</span></td><td><b>Timing en coördinatie van transacties</b></td><td>Afhankelijkheden zichtbaar: bouwoplevering → herfinanciering → nieuwe aankoop. Effect van vertraging automatisch doorgerekend.</td><td>Elke transactie heeft een datum, eigenaar en afhankelijkheid; vertraging in maanden → effect op minimum kasaldo.</td></tr>
+      <tr><td><span class="tag info">3 · Tertiair</span></td><td><b>Rendement en waardeontwikkeling</b></td><td>IRR per project en portefeuille, marktwaarde op basis van yield/factor, indexatie van huur en kosten, NAV.</td><td>Kwartaalrapportage uit het systeem, niet uit losse Excels.</td></tr>
+      <tr><td>Randvoorwaarde</td><td>Eén bron van waarheid</td><td>Alle objecten, leningen en geplande events in één model; iedereen kijkt naar dezelfde cijfers.</td><td>Maandafsluiting ≤ 1 dag; geen parallelle sheets.</td></tr>
+      <tr><td>Randvoorwaarde</td><td>Stuurbaar voor financiers</td><td>Covenants (DSCR, LTV, ICR) vooruit berekend per lening.</td><td>Covenant-breuk minimaal 2 kwartalen vooraf zichtbaar.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Kernvragen die het systeem moet beantwoorden</h3>
+  <table>
+    <thead><tr><th style="width:45%">Vraag</th><th>Antwoord komt uit</th></tr></thead>
+    <tbody>
+      <tr><td>Wanneer komen we cash tekort, en hoeveel?</td><td>Forecast engine → minimum kasaldo + datum per scenario</td></tr>
+      <tr><td>Welke aankoop kunnen we ons veroorloven, en wanneer?</td><td>Acquisitie-module × beschikbare liquiditeitsruimte per maand</td></tr>
+      <tr><td>Hoeveel eigen middelen zijn nodig, en wanneer moeten die betaald worden?</td><td>Cash events eigen inbreng + bijkomende kosten op passeer-/tranchedatum</td></tr>
+      <tr><td>Wanneer moet bouwfinanciering rond zijn en getrokken worden?</td><td>Tranche-planning met terugrekening doorlooptijd financier</td></tr>
+      <tr><td>Wanneer levert herfinanciering nieuw geld op?</td><td>Herfinancieringsmodule: netto opbrengst op verwachte datum</td></tr>
+      <tr><td>Wat gebeurt er als verkoop, aankoop of bouw 3 maanden vertraagt?</td><td>Scenario engine met vertragingsparameters per object</td></tr>
+      <tr><td>Wat is de portefeuille waard en wat renderen we?</td><td>Waarderingsmodule (yield/factor) + IRR/MOIC</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2>2. Functioneel model</h2>
+  <p>Het systeem bestaat uit vier lagen. Data stroomt van links naar rechts; alleen de invoerlaag wordt door gebruikers bewerkt, alle andere lagen zijn berekend.</p>
+  <div class="flow">
+    <div class="step"><b>1. Invoer (stamdata)</b>Objecten, huurcontracten, kosten, leningen, tranches, acquisities, herfinancieringen, verkopen, kasstand, crediteuren.</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>2. Event-generator</b>Zet elke afspraak om in gedateerde cash events (bedrag, datum, zekerheid, type).</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>3. Rekenkern</b>Forecast engine (maandbasis) × scenario engine (base/upside/downside) + waardering en rendement.</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>4. Output</b>Dashboards per doelgroep, KPI's, alerts, Excel/PDF-export.</div>
+  </div>
+
+  <h3>Functionele modules</h3>
+  <table>
+    <thead><tr><th style="width:20%">Module</th><th>Functie</th><th style="width:18%">Belangrijkste input</th><th style="width:18%">Output</th><th style="width:8%">Versie</th></tr></thead>
+    <tbody>
+      <tr><td><b>Objectbeheer</b></td><td>Register van alle objecten met levenscyclusstatus: acquisitie → ontwikkeling → bouw → eigendom → (her)financiering → verkoop.</td><td>Object, status, data</td><td>Objectlijst, statusflow</td><td>v1</td></tr>
+      <tr><td><b>Huur &amp; exploitatie</b></td><td>Huurstromen, leegstand, exploitatiekosten, NOI per object.</td><td>Huurcontract, kosten</td><td>NOI per maand</td><td>v1</td></tr>
+      <tr><td><b>Financiering</b></td><td>Leningen, rente, aflossing, covenants, afloopdatums.</td><td>Lening</td><td>Schuldendienst, LTV, DSCR</td><td>v1</td></tr>
+      <tr><td><b>Acquisitie</b></td><td>Pipeline met fase, kans, eigen inbreng, passeerdatum, financieringsdeadline.</td><td>Acquisitie</td><td>Cash-behoefte per maand</td><td>v1</td></tr>
+      <tr><td><b>Bouw &amp; ontwikkeling</b></td><td>Bouwbudget, betaaltermijnen aannemer, tranches bouwfinanciering, voortgang, vertraging.</td><td>Bouwproject, tranche</td><td>Bouwkosten vs opnames</td><td>v1</td></tr>
+      <tr><td><b>Herfinanciering</b></td><td>Geplande herfinancieringen, netto opbrengst, doorlooptijd, status.</td><td>Herfinanciering</td><td>Cash-in op datum</td><td>v1</td></tr>
+      <tr><td><b>Verkoop</b></td><td>Verkoopintenties, netto opbrengst na aflossing en kosten.</td><td>Verkoop</td><td>Cash-in op datum</td><td>v1</td></tr>
+      <tr><td><b>Liquiditeit</b></td><td>Kasstand per entiteit, minimum-kasbuffer, vrije ruimte.</td><td>Kasstand, drempels</td><td>Kasverloop, alerts</td><td>v1</td></tr>
+      <tr><td><b>Scenario's</b></td><td>Base/upside/downside + stress events.</td><td>Scenarioparameters</td><td>3 forecasts parallel</td><td>v1 (vast) / v2 (UI)</td></tr>
+      <tr><td><b>Waardering</b></td><td>Marktwaarde via yield en factor (BAR/NAR), NAV.</td><td>Yield, factor, NOI</td><td>Marktwaarde, NAV</td><td>v2</td></tr>
+      <tr><td><b>Rendement</b></td><td>IRR, MOIC, cash-on-cash per project en portefeuille.</td><td>Alle kasstromen</td><td>Rendementen</td><td>v2</td></tr>
+      <tr><td><b>Indexatie</b></td><td>CPI/vaste indexatie huur, kosten, bouwkosten.</td><td>Indexreeksen</td><td>Geïndexeerde stromen</td><td>v1 simpel / v2 volledig</td></tr>
+      <tr><td><b>Crediteuren</b></td><td>Openstaande posten, aanmaningen, betaalregelingen (Bijlage A).</td><td>Crediteur, regeling</td><td>Betaalverplichtingen</td><td>v1</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Levenscyclus van een object</h3>
+  <div class="flow">
+    <div class="step"><b>Acquisitie</b>Oriëntatie → due diligence → bod → koopovereenkomst → passeren</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Ontwikkeling</b>Vergunning, ontwerp, bouwbudget, bouwfinanciering aanvragen</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Bouw</b>Termijnen aannemer, tranche-opnames, voortgang</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Eigendom</b>Verhuur, exploitatie, herfinanciering</div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Exit</b>Verkoop of doorhouden</div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <h2>3. Entiteiten en tabellen</h2>
+  <table>
+    <thead><tr><th style="width:8%">Domein</th><th style="width:24%">Tabel</th><th>Doel</th><th style="width:26%">Relaties</th><th style="width:7%">v</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td><code>entiteit</code></td><td>Juridische entiteiten (holding, werkmaatschappij, project-BV).</td><td>1:n object, lening, kasstand</td><td>1</td></tr>
+      <tr><td>A</td><td><code>eigenaar</code></td><td>UBO's / aandeelhouders met participatie %.</td><td>n:m entiteit</td><td>1</td></tr>
+      <tr><td>A</td><td><code>object</code></td><td>Elk vastgoedobject, ongeacht status.</td><td>n:1 entiteit</td><td>1</td></tr>
+      <tr><td>A</td><td><code>huurcontract</code></td><td>Huurders en huurstromen per object.</td><td>n:1 object</td><td>1</td></tr>
+      <tr><td>A</td><td><code>kosten</code></td><td>Exploitatiekosten per object.</td><td>n:1 object</td><td>1</td></tr>
+      <tr><td>B</td><td><code>lening</code></td><td>Alle financieringen (hypotheek, bouw, mezzanine, aandeelhouderslening, overbrugging).</td><td>n:1 object/entiteit</td><td>1</td></tr>
+      <tr><td>B</td><td><code>tranche</code></td><td>Opnames onder een bouwfinanciering.</td><td>n:1 lening</td><td>1</td></tr>
+      <tr><td>B</td><td><code>herfinanciering</code></td><td>Geplande vervanging van een lening.</td><td>n:1 object; oud/nieuw lening</td><td>1</td></tr>
+      <tr><td>B</td><td><code>covenant</code></td><td>DSCR/LTV/ICR-eisen per lening, testmoment.</td><td>n:1 lening</td><td>2</td></tr>
+      <tr><td>C</td><td><code>acquisitie</code></td><td>Aankooppipeline.</td><td>1:1 object</td><td>1</td></tr>
+      <tr><td>C</td><td><code>bouwproject</code></td><td>Bouwbudget, planning, voortgang.</td><td>1:1 object; 1:n bouwtermijn</td><td>1</td></tr>
+      <tr><td>C</td><td><code>bouwtermijn</code></td><td>Betaaltermijnen aan aannemer.</td><td>n:1 bouwproject</td><td>1</td></tr>
+      <tr><td>C</td><td><code>verkoop</code></td><td>Verkoopintenties en -transacties.</td><td>n:1 object</td><td>1</td></tr>
+      <tr><td>C</td><td><code>cash_event</code></td><td>Alle gedateerde kasstromen (gegenereerd + handmatig).</td><td>n:1 object/lening/…</td><td>1</td></tr>
+      <tr><td>D</td><td><code>kasstand</code></td><td>Banksaldo per entiteit per peildatum.</td><td>n:1 entiteit</td><td>1</td></tr>
+      <tr><td>D</td><td><code>crediteur</code> / <code>betaalregeling</code></td><td>Openstaande schulden en regelingen (Bijlage A).</td><td>n:1 entiteit</td><td>1</td></tr>
+      <tr><td>E</td><td><code>scenario</code></td><td>Definitie base/upside/downside/custom.</td><td>1:n parameter</td><td>1</td></tr>
+      <tr><td>E</td><td><code>scenario_parameter</code></td><td>Aannames per scenario.</td><td>n:1 scenario</td><td>1</td></tr>
+      <tr><td>E</td><td><code>object_scenario_override</code></td><td>Afwijking per object (bijv. 4 mnd vertraging bouw).</td><td>n:1 object, scenario</td><td>1</td></tr>
+      <tr><td>E</td><td><code>indexreeks</code></td><td>CPI, bouwkostenindex, Euribor per maand.</td><td>—</td><td>2</td></tr>
+      <tr><td>E</td><td><code>waardering</code></td><td>Taxaties en yield/factor-waarderingen in de tijd.</td><td>n:1 object</td><td>2</td></tr>
+      <tr><td>F</td><td><code>forecast_maand</code></td><td>Berekende output per maand × scenario × object.</td><td>berekend</td><td>1</td></tr>
+      <tr><td>F</td><td><code>alert</code></td><td>Gegenereerde waarschuwingen.</td><td>n:1 object/lening</td><td>1</td></tr>
+      <tr><td>F</td><td><code>instelling</code></td><td>Drempels (min. kasbuffer, alerttermijnen).</td><td>—</td><td>1</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4 -->
+<section>
+  <h2>4. Velden per entiteit</h2>
+  <p class="small">Standaardvelden op elke tabel (niet herhaald): <code>id</code> (UUID, PK), <code>aangemaakt_op</code>, <code>gewijzigd_op</code>, <code>gewijzigd_door</code>, <code>notities</code>.</p>
+
+  <h3>entiteit</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>naam</code></td><td>tekst</td><td>Bijv. "Project Breda BV"</td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>holding / werkmaatschappij / project_bv / stichting</td></tr>
+    <tr><td><code>moeder_id</code></td><td>FK entiteit</td><td>Groepsstructuur</td></tr>
+    <tr><td><code>kvk_nummer</code></td><td>tekst</td><td></td></tr>
+    <tr><td><code>min_kasbuffer</code></td><td>euro</td><td>Minimumsaldo dat op deze entiteit moet blijven</td></tr>
+    <tr><td><code>cash_vrij_opneembaar</code></td><td>boolean</td><td>Mag cash naar holding (geen dividendblokkade van bank)?</td></tr>
+  </tbody></table>
+
+  <h3>object</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>entiteit_id</code></td><td>FK</td><td>Juridisch eigenaar</td></tr>
+    <tr><td><code>naam</code>, <code>adres</code>, <code>stad</code></td><td>tekst</td><td></td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>woning / appartementen / kantoor / retail / bedrijfsruimte / gemengd / grond</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td>acquisitie / ontwikkeling / bouw / eigendom / verkoop / verkocht</td></tr>
+    <tr><td><code>bvo_m2</code>, <code>vvo_m2</code></td><td>getal</td><td>Bruto/verhuurbaar vloeroppervlak</td></tr>
+    <tr><td><code>aantal_eenheden</code></td><td>integer</td><td>Woningen/units</td></tr>
+    <tr><td><code>aankoopdatum</code></td><td>datum</td><td>Werkelijk of verwacht</td></tr>
+    <tr><td><code>aankoopprijs</code></td><td>euro</td><td>Koopsom k.k. of v.o.n.</td></tr>
+    <tr><td><code>kostprijs_totaal</code></td><td>euro</td><td>Aankoop + bijkomende kosten + investeringen</td></tr>
+    <tr><td><code>taxatiewaarde</code>, <code>taxatiedatum</code></td><td>euro / datum</td><td>Laatste taxatie</td></tr>
+    <tr><td><code>woz_waarde</code></td><td>euro</td><td>Basis OZB</td></tr>
+    <tr><td><code>waarderingsmethode</code></td><td>enum</td><td>taxatie / yield / factor</td></tr>
+    <tr><td><code>yield_pct</code></td><td>getal</td><td>Netto of bruto yield (zie <code>yield_basis</code>)</td></tr>
+    <tr><td><code>yield_basis</code></td><td>enum</td><td>BAR (bruto huur) / NAR (NOI)</td></tr>
+    <tr><td><code>factor</code></td><td>getal</td><td>Kapitalisatiefactor (bijv. 16× bruto jaarhuur)</td></tr>
+    <tr><td><code>verwachte_oplevering</code></td><td>datum</td><td>Bij bouw/ontwikkeling</td></tr>
+    <tr><td><code>strategie</code></td><td>enum</td><td>houden / verkopen / splitsen / herontwikkelen</td></tr>
+  </tbody></table>
+
+  <h3>huurcontract</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>object_id</code></td><td>FK</td><td></td></tr>
+    <tr><td><code>huurder</code></td><td>tekst</td><td></td></tr>
+    <tr><td><code>huur_maand</code></td><td>euro</td><td>Kale huur per maand (actueel)</td></tr>
+    <tr><td><code>servicekosten_maand</code></td><td>euro</td><td>Doorbelast (neutraal voor NOI indien kostendekkend)</td></tr>
+    <tr><td><code>ingangsdatum</code>, <code>einddatum</code></td><td>datum</td><td>Einddatum leeg = onbepaalde tijd</td></tr>
+    <tr><td><code>opzegtermijn_mnd</code></td><td>integer</td><td></td></tr>
+    <tr><td><code>indexatie_type</code></td><td>enum</td><td>CPI / vast_pct / CPI_plus / geen</td></tr>
+    <tr><td><code>indexatie_pct</code></td><td>getal</td><td>Vast % of opslag bij CPI_plus</td></tr>
+    <tr><td><code>indexatie_cap_pct</code>, <code>indexatie_floor_pct</code></td><td>getal</td><td>Maximum/minimum indexatie</td></tr>
+    <tr><td><code>indexatiemaand</code></td><td>1–12</td><td>Jaarlijkse indexatiemaand</td></tr>
+    <tr><td><code>verlengkans_pct</code></td><td>getal</td><td>Kans dat huurder na einddatum blijft</td></tr>
+    <tr><td><code>leegstand_mnd_na_vertrek</code></td><td>integer</td><td>Verwachte frictieleegstand</td></tr>
+    <tr><td><code>huurvrije_periode_mnd</code></td><td>integer</td><td>Incentive bij nieuwe huurder</td></tr>
+    <tr><td><code>waarborgsom</code> / <code>bankgarantie</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>betaalgedrag</code></td><td>enum</td><td>goed / wisselend / achterstand</td></tr>
+  </tbody></table>
+
+  <h3>kosten</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>object_id</code> / <code>entiteit_id</code></td><td>FK</td><td>Objectkosten of overhead op entiteitsniveau</td></tr>
+    <tr><td><code>categorie</code></td><td>enum</td><td>onderhoud / beheer / verzekering / OZB / VvE / erfpacht / overhead / belasting / overig</td></tr>
+    <tr><td><code>bedrag_jaar</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>betaalfrequentie</code></td><td>enum</td><td>maandelijks / kwartaal / jaarlijks (bepaalt timing cash event)</td></tr>
+    <tr><td><code>betaalmaand</code></td><td>1–12</td><td>Bij jaarlijkse betaling (bijv. OZB in maart)</td></tr>
+    <tr><td><code>indexatie_pct</code></td><td>getal</td><td>Jaarlijkse stijging</td></tr>
+    <tr><td><code>geldig_van</code>, <code>geldig_tot</code></td><td>datum</td><td></td></tr>
+  </tbody></table>
+
+  <h3>lening</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>object_id</code> / <code>entiteit_id</code></td><td>FK</td><td>Lening kan op object of portefeuille zitten</td></tr>
+    <tr><td><code>geldgever</code></td><td>tekst</td><td></td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>hypotheek / bouwfinanciering / mezzanine / aandeelhouderslening / overbrugging / rekening_courant</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td>concept / aangevraagd / termsheet / toegezegd / actief / afgelost / geweigerd</td></tr>
+    <tr><td><code>hoofdsom</code></td><td>euro</td><td>Totale faciliteit</td></tr>
+    <tr><td><code>uitstaand_saldo</code>, <code>saldo_peildatum</code></td><td>euro / datum</td><td></td></tr>
+    <tr><td><code>rente_type</code></td><td>enum</td><td>vast / variabel</td></tr>
+    <tr><td><code>rente_pct</code></td><td>getal</td><td>Vaste rente, of basisrente</td></tr>
+    <tr><td><code>opslag_bps</code></td><td>integer</td><td>Opslag op Euribor bij variabel</td></tr>
+    <tr><td><code>rentebetaling</code></td><td>enum</td><td>maandelijks / kwartaal / bijschrijven (PIK, typisch bouw/mezzanine)</td></tr>
+    <tr><td><code>aflossingstype</code></td><td>enum</td><td>annuïteit / lineair / bullet / vast_bedrag</td></tr>
+    <tr><td><code>aflossing_bedrag</code>, <code>aflossing_frequentie</code></td><td>euro / enum</td><td>Bij vast_bedrag of lineair</td></tr>
+    <tr><td><code>ingangsdatum</code>, <code>einddatum</code></td><td>datum</td><td>Einddatum = kritiek event</td></tr>
+    <tr><td><code>rentevast_tot</code></td><td>datum</td><td>Renteherziening</td></tr>
+    <tr><td><code>commitment_fee_pct</code></td><td>getal</td><td>Over niet-getrokken deel</td></tr>
+    <tr><td><code>afsluitprovisie</code></td><td>euro</td><td>Eenmalig bij ingang</td></tr>
+    <tr><td><code>boete_vervroegd_pct</code></td><td>getal</td><td>Boeterente bij vervroegd aflossen</td></tr>
+    <tr><td><code>covenant_ltv_max</code>, <code>covenant_dscr_min</code>, <code>covenant_icr_min</code></td><td>getal</td><td></td></tr>
+    <tr><td><code>doorlooptijd_aanvraag_wkn</code></td><td>integer</td><td>Standaard 8–12 weken; basis voor deadline-alerts</td></tr>
+  </tbody></table>
+
+  <h3>tranche</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>lening_id</code>, <code>bouwtermijn_id</code></td><td>FK</td><td>Tranche financiert een bouwtermijn</td></tr>
+    <tr><td><code>volgnummer</code></td><td>integer</td><td></td></tr>
+    <tr><td><code>bedrag</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>verwachte_datum</code>, <code>werkelijke_datum</code></td><td>datum</td><td></td></tr>
+    <tr><td><code>voorwaarde</code></td><td>tekst</td><td>Bijv. "ruwbouw gereed + verklaring bouwkundige"</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td>gepland / ingediend / goedgekeurd / getrokken</td></tr>
+  </tbody></table>
+
+  <h3>bouwproject &amp; bouwtermijn</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>bouwproject.object_id</code></td><td>FK</td><td></td></tr>
+    <tr><td><code>aannemer</code></td><td>tekst</td><td></td></tr>
+    <tr><td><code>bouwbudget</code></td><td>euro</td><td>Aanneemsom + bijkomende bouwkosten</td></tr>
+    <tr><td><code>onvoorzien_pct</code></td><td>getal</td><td>Standaard 5–10%</td></tr>
+    <tr><td><code>start_bouw</code>, <code>geplande_oplevering</code>, <code>verwachte_oplevering</code></td><td>datum</td><td>Verschil = vertraging</td></tr>
+    <tr><td><code>voortgang_pct</code></td><td>getal</td><td></td></tr>
+    <tr><td><code>eigen_inbreng_bouw</code></td><td>euro</td><td>Deel dat vóór eerste tranche uit eigen middelen moet</td></tr>
+    <tr><td><code>bouwtermijn.omschrijving</code></td><td>tekst</td><td>Bijv. "Termijn 3 — ruwbouw 2e verdieping"</td></tr>
+    <tr><td><code>bouwtermijn.bedrag</code>, <code>verwachte_datum</code>, <code>status</code></td><td>euro / datum / enum</td><td>gepland / gefactureerd / betaald</td></tr>
+    <tr><td><code>bouwtermijn.financiering</code></td><td>enum</td><td>eigen_middelen / tranche / mix</td></tr>
+  </tbody></table>
+
+  <h3>acquisitie</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>object_id</code></td><td>FK</td><td></td></tr>
+    <tr><td><code>fase</code></td><td>enum</td><td>oriëntatie / due_diligence / bod / koopovereenkomst / financiering_rond / gepasseerd / afgeblazen</td></tr>
+    <tr><td><code>koopsom</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>overdrachtsbelasting_pct</code></td><td>getal</td><td>2% / 10,4% / 0% (afhankelijk van type)</td></tr>
+    <tr><td><code>bijkomende_kosten</code></td><td>euro</td><td>Notaris, DD, makelaar, taxatie, advies</td></tr>
+    <tr><td><code>waarborgsom_pct</code>, <code>waarborgsom_datum</code></td><td>getal / datum</td><td>Meestal 10% bij tekenen KO — eerste cash-uit!</td></tr>
+    <tr><td><code>financiering_bedrag</code>, <code>lening_id</code></td><td>euro / FK</td><td></td></tr>
+    <tr><td><code>eigen_inbreng</code></td><td>berekend</td><td>Koopsom + OVB + kosten − financiering</td></tr>
+    <tr><td><code>passeerdatum</code></td><td>datum</td><td></td></tr>
+    <tr><td><code>financieringsvoorbehoud_datum</code></td><td>datum</td><td>Uiterste datum ontbinding</td></tr>
+    <tr><td><code>kans_pct</code></td><td>getal</td><td>Voor gewogen pipeline</td></tr>
+    <tr><td><code>meenemen_in_forecast</code></td><td>boolean</td><td>Ook harde keuze naast kansweging</td></tr>
+  </tbody></table>
+
+  <h3>herfinanciering</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>object_id</code>, <code>oude_lening_id</code>, <code>nieuwe_lening_id</code></td><td>FK</td><td></td></tr>
+    <tr><td><code>verwachte_datum</code></td><td>datum</td><td></td></tr>
+    <tr><td><code>verwachte_waarde</code></td><td>euro</td><td>Taxatie waarop de nieuwe lening gebaseerd wordt</td></tr>
+    <tr><td><code>ltv_nieuw_pct</code></td><td>getal</td><td>Nieuwe hoofdsom = waarde × LTV</td></tr>
+    <tr><td><code>kosten</code></td><td>euro</td><td>Taxatie, notaris, advies, provisie, boete</td></tr>
+    <tr><td><code>netto_opbrengst</code></td><td>berekend</td><td>Zie business rule 5D</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td>gepland / taxatie / aangevraagd / termsheet / toegezegd / afgerond</td></tr>
+    <tr><td><code>aanvraag_uiterlijk</code></td><td>berekend</td><td>verwachte_datum − doorlooptijd − marge</td></tr>
+  </tbody></table>
+
+  <h3>verkoop</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>object_id</code></td><td>FK</td><td></td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>geheel / uitponden (per eenheid)</td></tr>
+    <tr><td><code>verwachte_prijs</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>verkoopkosten_pct</code></td><td>getal</td><td>Standaard 1,5–2%</td></tr>
+    <tr><td><code>verwachte_datum</code></td><td>datum</td><td>Bij uitponden: startdatum + tempo</td></tr>
+    <tr><td><code>eenheden_per_maand</code></td><td>getal</td><td>Verkooptempo bij uitponden</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td>intentie / in_verkoop / onder_bod / verkocht / geleverd</td></tr>
+  </tbody></table>
+
+  <h3>cash_event</h3>
+  <table><thead><tr><th style="width:26%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>datum</code></td><td>datum</td><td></td></tr>
+    <tr><td><code>bedrag</code></td><td>euro</td><td>+ = ontvangst, − = uitgave</td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>huur / exploitatiekosten / rente / aflossing / waarborgsom / eigen_inbreng / koopsom / OVB / bouwtermijn / tranche / herfi_opname / herfi_aflossing / verkoop / crediteur / overhead / belasting / dividend / kapitaalstorting / overig</td></tr>
+    <tr><td><code>object_id</code>, <code>entiteit_id</code>, <code>bron_tabel</code>, <code>bron_id</code></td><td>FK</td><td>Herleidbaar naar de afspraak</td></tr>
+    <tr><td><code>bron</code></td><td>enum</td><td>gegenereerd / handmatig</td></tr>
+    <tr><td><code>zekerheid</code></td><td>enum</td><td>contractueel / verwacht / onzeker</td></tr>
+    <tr><td><code>scenario_id</code></td><td>FK</td><td>Null = geldt voor alle scenario's</td></tr>
+  </tbody></table>
+
+  <h3>kasstand, scenario_parameter, object_scenario_override, instelling</h3>
+  <table><thead><tr><th style="width:30%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td><code>kasstand.entiteit_id</code>, <code>rekening</code>, <code>saldo</code>, <code>peildatum</code></td><td>FK/tekst/euro/datum</td><td>Startpunt forecast</td></tr>
+    <tr><td><code>kasstand.geblokkeerd</code></td><td>euro</td><td>Bijv. verpande rentereserve</td></tr>
+    <tr><td><code>scenario_parameter.scenario_id</code>, <code>sleutel</code>, <code>waarde</code>, <code>eenheid</code></td><td>FK/tekst/getal/enum</td><td>Zie hoofdstuk 7</td></tr>
+    <tr><td><code>override.object_id</code>, <code>scenario_id</code>, <code>sleutel</code>, <code>waarde</code></td><td>FK/tekst/getal</td><td>Bijv. bouw_vertraging_mnd = 4 voor Breda</td></tr>
+    <tr><td><code>instelling.min_kasbuffer</code></td><td>euro</td><td>Groepsbrede drempel (bijv. € 500k)</td></tr>
+    <tr><td><code>instelling.alert_horizon_mnd</code></td><td>integer</td><td>Bijv. 6</td></tr>
+  </tbody></table>
+</section>
+
+<!-- 5 -->
+<section>
+  <h2>5. Business rules</h2>
+  <div class="box"><b>Hoofdregel.</b> Elke afspraak in de invoerlaag leidt tot één of meer cash events met een datum. De forecast telt uitsluitend cash events op. Er is geen "verborgen" berekening buiten de events om — alles is herleidbaar.</div>
+
+  <h3>5A — Cashflow</h3>
+  <table><thead><tr><th style="width:22%">Regel</th><th>Berekening / logica</th></tr></thead><tbody>
+    <tr><td>Huur</td><td>Per maand: <code>huur_maand × indexfactor(t)</code>. Na einddatum: met kans <code>verlengkans</code> doorlopen, anders <code>leegstand_mnd_na_vertrek</code> nul, dan huurvrije periode, dan markthuur.</td></tr>
+    <tr><td>Leegstand (algemeen)</td><td>Scenario-opslag: <code>huur × (1 − leegstand_pct_scenario)</code> op niet-gecontracteerde of verlopen huur.</td></tr>
+    <tr><td>Huurderving/debiteuren</td><td>Scenario-parameter <code>inningsverlies_pct</code> (base 1%).</td></tr>
+    <tr><td>Exploitatiekosten</td><td>Geboekt volgens <code>betaalfrequentie</code> en <code>betaalmaand</code> — niet gelijkmatig als ze niet zo betaald worden (OZB, verzekering jaarlijks).</td></tr>
+    <tr><td>NOI</td><td><code>huur − exploitatiekosten</code> (excl. financiering, excl. overhead).</td></tr>
+    <tr><td>Overhead</td><td>Op entiteitsniveau, niet per object; wel in kasstroom.</td></tr>
+    <tr><td>Belasting</td><td>Vennootschapsbelasting als handmatig/voorlopige aanslag-event (v1); berekend in v3.</td></tr>
+    <tr><td>Tijdstip</td><td>Alle events op maandniveau geaggregeerd; binnen een maand worden uitgaven vóór ontvangsten geboekt (conservatief: toont het dieptepunt binnen de maand).</td></tr>
+  </tbody></table>
+
+  <h3>5B — Financiering</h3>
+  <div class="formula">Rente(t)       = saldo(t) × (rente_pct [+ Euribor(t) + opslag]) / 12
+Annuïteit      = H × r / (1 − (1 + r)^−n)          r = maandrente, n = resterende maanden
+Lineair        = H / n per maand
+Bullet         = volledig saldo op einddatum
+PIK-rente      = rente wordt bij saldo opgeteld, geen cash-uit (bouw/mezzanine)
+Commitment fee = (hoofdsom − getrokken) × fee_pct / 12</div>
+  <ul>
+    <li><b>Einddatum zonder opvolging</b> (geen herfinanciering gekoppeld): het volledige saldo wordt als uitgave geboekt op de einddatum → forecast toont direct het gat. Dit is bewust: geen stille aanname dat verlenging lukt.</li>
+    <li><b>Covenants</b> worden elke maand vooruit getest met forecast-NOI en forecast-waarde.</li>
+    <li><b>Afsluitprovisie</b> en kosten als uitgave op ingangsdatum.</li>
+  </ul>
+
+  <h3>5C — Aankoop</h3>
+  <table><thead><tr><th style="width:26%">Moment</th><th>Cash event</th></tr></thead><tbody>
+    <tr><td>Tekenen koopovereenkomst</td><td>− waarborgsom/bankgarantie (typisch 10% koopsom); DD-kosten vóór die datum</td></tr>
+    <tr><td>Passeerdatum</td><td>− koopsom − OVB − bijkomende kosten + waarborgsom (verrekend) + financiering</td></tr>
+    <tr><td>Netto op passeerdatum</td><td><code>eigen_inbreng = koopsom + OVB + kosten − financiering − reeds betaalde waarborgsom</code></td></tr>
+    <tr><td>Weging</td><td>In forecast: fase ≥ koopovereenkomst → 100%; eerdere fases alleen als <code>meenemen_in_forecast</code> = ja, of gewogen met <code>kans_pct</code> in een aparte "pipeline"-lijn.</td></tr>
+    <tr><td>Deadline</td><td><code>financiering_aanvragen_uiterlijk = passeerdatum − doorlooptijd − 2 weken marge</code></td></tr>
+    <tr><td>Betaalbaarheidstoets</td><td>Een aankoop is "betaalbaar" als het minimum kasaldo in alle maanden ná passeren ≥ <code>min_kasbuffer</code> blijft in base én downside.</td></tr>
+  </tbody></table>
+
+  <h3>5D — Herfinanciering</h3>
+  <div class="formula">Nieuwe hoofdsom   = min(verwachte_waarde × ltv_nieuw_pct , DSCR-capaciteit)
+DSCR-capaciteit   = hoofdsom waarbij NOI / schuldendienst = covenant_dscr_min
+Netto opbrengst   = nieuwe hoofdsom − saldo_oud(datum) − boete − kosten</div>
+  <ul>
+    <li>Positief = cash-in; negatief = bijstorten (ook een cash event!).</li>
+    <li>De DSCR-toets voorkomt het klassieke fout: waarde gestegen, maar door hogere rente kan de bank minder lenen.</li>
+    <li>Vertraging &gt; 60 dagen of status nog "gepland" terwijl <code>aanvraag_uiterlijk</code> verstreken is → kritieke alert.</li>
+  </ul>
+
+  <h3>5E — Bouw</h3>
+  <ul>
+    <li>Bouwtermijnen aan aannemer zijn uitgaven op <code>verwachte_datum</code>.</li>
+    <li>Eerst <code>eigen_inbreng_bouw</code> volledig betaald (bank eist dat meestal), daarna worden termijnen gefinancierd met tranches.</li>
+    <li>Tranche-opname volgt termijn met <code>tranche_vertraging_dagen</code> (base 15 dagen): de aannemer moet vaak eerder betaald worden dan de bank stort → tijdelijk gat, expliciet zichtbaar.</li>
+    <li>Bouwrente: per maand over getrokken saldo; PIK of cash volgens lening.</li>
+    <li>Onvoorzien: <code>onvoorzien_pct</code> als extra uitgave, naar rato over de bouwduur.</li>
+    <li>Vertraging <i>x</i> maanden: alle nog niet betaalde termijnen, tranches, oplevering, huurstart én gekoppelde herfinanciering schuiven <i>x</i> maanden. Bouwkosten stijgen met <code>bouwkosteninflatie × x/12</code>.</li>
+  </ul>
+
+  <h3>5F — Verkoop</h3>
+  <div class="formula">Netto opbrengst = prijs × (1 + prijsafwijking_scenario) × (1 − verkoopkosten_pct)
+                  − saldo gekoppelde leningen − boete − eventuele Vpb op boekwinst</div>
+  <ul>
+    <li>Uitponden: per maand <code>eenheden_per_maand</code> verkocht; per eenheid wordt het pro-rata deel van de lening afgelost (lossingsbedrag, vaak 100–110% van toegerekende schuld).</li>
+    <li>Downside: prijs −x%, datum +y maanden (scenarioparameter).</li>
+  </ul>
+
+  <h3>5G — Indexatie</h3>
+  <table><thead><tr><th style="width:26%">Stroom</th><th style="width:26%">Basis</th><th style="width:18%">Moment</th><th>Regel</th></tr></thead><tbody>
+    <tr><td>Huur</td><td>CPI / vast / CPI+opslag</td><td>Indexatiemaand contract</td><td>Met cap en floor; CPI uit indexreeks, anders scenariowaarde</td></tr>
+    <tr><td>Exploitatiekosten</td><td>% per categorie</td><td>1 januari</td><td>Compounding jaarlijks</td></tr>
+    <tr><td>OZB</td><td>WOZ × tarief</td><td>Jaarlijks</td><td>WOZ volgt marktwaardeontwikkeling met 1 jaar vertraging</td></tr>
+    <tr><td>Bouwkosten (niet gecontracteerd)</td><td>Bouwkostenindex</td><td>Maandelijks</td><td>Alleen op niet-vaste aanneemsom</td></tr>
+    <tr><td>Markthuur (ERV)</td><td>Huurgroei scenario</td><td>Jaarlijks</td><td>Voor nieuwe verhuur en waardering</td></tr>
+    <tr><td>Variabele rente</td><td>Euribor-curve</td><td>Per renteperiode</td><td>Base = forward curve; downside +75 bps</td></tr>
+  </tbody></table>
+
+  <h3>5H — Waardering</h3>
+  <div class="formula">Yield (NAR):   marktwaarde = NOI_jaar / netto_yield
+Yield (BAR):   marktwaarde k.k. = brutohuur_jaar / bruto_yield
+Factor:        marktwaarde = brutohuur_jaar × factor
+Bouw:          waarde = grondwaarde + gerealiseerde bouwkosten (tot oplevering)
+NAV:           Σ marktwaarde − Σ schuld (− latente belasting, optioneel)</div>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2>6. Forecast engine — maandbasis, 24–36 maanden</h2>
+  <h3>Algoritme</h3>
+  <ol>
+    <li><b>Startpunt:</b> Σ kasstand per entiteit op peildatum (minus geblokkeerd).</li>
+    <li><b>Scenario laden:</b> parameters + object-overrides.</li>
+    <li><b>Events genereren:</b> voor elke bron-afspraak de cash events maken, met verschuivingen (vertraging) en afwijkingen (prijs, rente) uit het scenario.</li>
+    <li><b>Leningschema's rollen:</b> maand voor maand saldo, rente, aflossing — inclusief tranches, herfinanciering en aflossing bij verkoop.</li>
+    <li><b>Aggregeren</b> per maand × entiteit × object × event-type.</li>
+    <li><b>Kasaldo</b> cumulatief per entiteit én geconsolideerd.</li>
+    <li><b>Ratio's</b> per maand: LTV, DSCR, ICR, covenant-toets.</li>
+    <li><b>Alerts</b> genereren (Bijlage B).</li>
+    <li>Herhalen voor elk scenario; resultaten opslaan met versie en tijdstempel (voor vergelijking met vorige maand).</li>
+  </ol>
+
+  <h3>Output per maand (forecast_maand)</h3>
+  <table><thead><tr><th style="width:28%">Kolom</th><th>Berekening</th></tr></thead><tbody>
+    <tr><td><code>maand</code></td><td>t+1 … t+36</td></tr>
+    <tr><td><code>kasaldo_begin</code></td><td>Vorige maand eind</td></tr>
+    <tr><td colspan="2"><b>Operationeel</b></td></tr>
+    <tr><td><code>huur</code></td><td>Σ geïndexeerde huur − leegstand − inningsverlies</td></tr>
+    <tr><td><code>exploitatiekosten</code></td><td>Σ kosten volgens betaalritme</td></tr>
+    <tr><td><code>noi</code></td><td>huur − exploitatiekosten</td></tr>
+    <tr><td><code>overhead_belasting</code></td><td>Entiteitskosten, Vpb</td></tr>
+    <tr><td colspan="2"><b>Financiering (regulier)</b></td></tr>
+    <tr><td><code>rente</code></td><td>Σ rente cash (excl. PIK)</td></tr>
+    <tr><td><code>aflossing</code></td><td>Σ reguliere aflossing</td></tr>
+    <tr><td><code>operationele_kasstroom</code></td><td>noi − overhead − rente − aflossing</td></tr>
+    <tr><td colspan="2"><b>Transacties</b></td></tr>
+    <tr><td><code>aankopen</code></td><td>− waarborgsom, eigen inbreng, OVB, kosten</td></tr>
+    <tr><td><code>bouw_uit</code></td><td>− bouwtermijnen + onvoorzien</td></tr>
+    <tr><td><code>tranches_in</code></td><td>+ opnames bouwfinanciering</td></tr>
+    <tr><td><code>herfinanciering_netto</code></td><td>± netto opbrengst</td></tr>
+    <tr><td><code>verkoop_netto</code></td><td>+ netto verkoopopbrengst</td></tr>
+    <tr><td><code>leningen_aflopend</code></td><td>− bullet-aflossingen zonder opvolging</td></tr>
+    <tr><td><code>crediteuren</code></td><td>− termijnen betaalregelingen en openstaande posten</td></tr>
+    <tr><td><code>overig</code></td><td>Kapitaalstortingen, dividend, handmatig</td></tr>
+    <tr><td colspan="2"><b>Resultaat</b></td></tr>
+    <tr><td><code>netto_kasstroom</code></td><td>Σ bovenstaande</td></tr>
+    <tr><td><code>kasaldo_eind</code></td><td>begin + netto</td></tr>
+    <tr><td><code>vrije_ruimte</code></td><td>kasaldo_eind − min_kasbuffer</td></tr>
+    <tr><td><code>schuld_totaal</code>, <code>ltv</code>, <code>dscr</code>, <code>icr</code></td><td>Ratio's per maand</td></tr>
+    <tr><td><code>status</code></td><td>groen (≥ buffer) · oranje (0 – buffer) · rood (&lt; 0)</td></tr>
+  </tbody></table>
+
+  <h3>Voorbeeld forecast (base, bedragen × € 1.000)</h3>
+  <table><thead><tr><th>Maand</th><th>NOI</th><th>Rente+afl.</th><th>Aankoop</th><th>Bouw</th><th>Tranches</th><th>Herfi</th><th>Netto</th><th>Kasaldo</th><th>Status</th></tr></thead><tbody>
+    <tr><td>okt-26</td><td>60</td><td>−48</td><td>0</td><td>−180</td><td>150</td><td>0</td><td>−18</td><td>2.822</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>nov-26</td><td>60</td><td>−48</td><td>−220</td><td>−180</td><td>150</td><td>0</td><td>−238</td><td>2.584</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>dec-26</td><td>60</td><td>−48</td><td>−1.450</td><td>−200</td><td>0</td><td>0</td><td>−1.638</td><td>946</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>jan-27</td><td>55</td><td>−48</td><td>0</td><td>−200</td><td>150</td><td>0</td><td>−43</td><td>903</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>feb-27</td><td>55</td><td>−2.348</td><td>0</td><td>−200</td><td>150</td><td>2.450</td><td>107</td><td>1.010</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>mrt-27</td><td>55</td><td>−48</td><td>0</td><td>−250</td><td>0</td><td>0</td><td>−243</td><td>767</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>apr-27</td><td>55</td><td>−48</td><td>0</td><td>−250</td><td>0</td><td>0</td><td>−243</td><td>524</td><td><span class="tag info">groen</span></td></tr>
+    <tr><td>mei-27</td><td>55</td><td>−48</td><td>0</td><td>−250</td><td>150</td><td>0</td><td>−93</td><td>431</td><td><span class="tag warn">oranje</span></td></tr>
+  </tbody></table>
+  <p class="small">In downside schuift de herfinanciering van feb-27 drie maanden op: kasaldo in apr-27 wordt −1.926 → <b>rood</b>. Dat is precies het signaal dat het systeem 6+ maanden vooraf moet geven.</p>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2>7. Scenario engine</h2>
+  <p>Drie scenario's draaien altijd parallel. Daarnaast kan de gebruiker <b>custom scenario's</b> en <b>stress events</b> aanmaken die een kopie van base met afwijkingen zijn.</p>
+  <table><thead><tr><th style="width:34%">Parameter</th><th>Base</th><th>Upside</th><th>Downside</th><th style="width:22%">Werkt op</th></tr></thead><tbody>
+    <tr><td>CPI (huurindexatie)</td><td>2,5%</td><td>3,0%</td><td>1,5%</td><td>Huur</td></tr>
+    <tr><td>Markthuurgroei (ERV)</td><td>2,5%</td><td>4,0%</td><td>0,0%</td><td>Nieuwe verhuur, waarde</td></tr>
+    <tr><td>Leegstand (structureel)</td><td>3%</td><td>1%</td><td>8%</td><td>Huur</td></tr>
+    <tr><td>Frictieleegstand na vertrek</td><td>3 mnd</td><td>1 mnd</td><td>6 mnd</td><td>Huur</td></tr>
+    <tr><td>Inningsverlies</td><td>1%</td><td>0,5%</td><td>3%</td><td>Huur</td></tr>
+    <tr><td>Kostenstijging</td><td>3,0%</td><td>2,5%</td><td>5,0%</td><td>Exploitatie</td></tr>
+    <tr><td>Euribor-verschuiving</td><td>forward</td><td>−25 bps</td><td>+75 bps</td><td>Variabele rente, herfi</td></tr>
+    <tr><td>Rente nieuwe leningen</td><td>4,75%</td><td>4,25%</td><td>5,75%</td><td>Herfi, nieuwe financiering</td></tr>
+    <tr><td>LTV bij herfinanciering</td><td>60%</td><td>65%</td><td>50%</td><td>Herfi-opbrengst</td></tr>
+    <tr><td>Vertraging herfinanciering</td><td>0 mnd</td><td>0 mnd</td><td>+3 mnd</td><td>Timing cash-in</td></tr>
+    <tr><td>Vertraging bouw/oplevering</td><td>0 mnd</td><td>0 mnd</td><td>+4 mnd</td><td>Termijnen, tranches, huurstart</td></tr>
+    <tr><td>Bouwkostenoverschrijding</td><td>0%</td><td>0%</td><td>+8%</td><td>Bouw</td></tr>
+    <tr><td>Vertraging aankoop</td><td>0 mnd</td><td>0 mnd</td><td>+2 mnd</td><td>Passeerdatum</td></tr>
+    <tr><td>Vertraging verkoop</td><td>0 mnd</td><td>−1 mnd</td><td>+6 mnd</td><td>Verkoop cash-in</td></tr>
+    <tr><td>Verkoopprijsafwijking</td><td>0%</td><td>+5%</td><td>−10%</td><td>Verkoop</td></tr>
+    <tr><td>Exit/marktyield</td><td>5,25%</td><td>4,90%</td><td>6,00%</td><td>Waarde, LTV, herfi</td></tr>
+    <tr><td>Pipeline-acquisities</td><td>gewogen</td><td>alle</td><td>alleen KO getekend</td><td>Aankoop</td></tr>
+  </tbody></table>
+
+  <h3>Stress events (voorbeelden)</h3>
+  <table><thead><tr><th style="width:32%">Stress event</th><th>Effect in model</th></tr></thead><tbody>
+    <tr><td>Grootste huurder vertrekt per maand X</td><td>Contract eindigt op X, verlengkans 0%, frictieleegstand scenario</td></tr>
+    <tr><td>Bank weigert herfinanciering Utrecht</td><td>Oude lening lost af op einddatum, geen nieuwe opname</td></tr>
+    <tr><td>Bouw Amsterdam 6 maanden stil</td><td>Override bouw_vertraging_mnd = 6 voor dat object</td></tr>
+    <tr><td>Rente +200 bps</td><td>Euribor-verschuiving +200 bps, alle scenario's</td></tr>
+    <tr><td>Waardedaling 15%</td><td>Yield-shift zodat waarde −15% → LTV-covenant-toets</td></tr>
+  </tbody></table>
+
+  <h3>Scenario-output</h3>
+  <ul>
+    <li>Kasverloop: drie lijnen (upside groen, base blauw, downside rood) met drempellijn min. kasbuffer.</li>
+    <li>Tabel: minimum kasaldo + maand per scenario, eerste maand onder buffer, eerste maand negatief.</li>
+    <li><b>Break-even vertraging:</b> hoeveel maanden mag een event vertragen voordat de buffer wordt geraakt? (bijv. "Herfi Utrecht mag max. 2 maanden schuiven").</li>
+    <li>Tornado-grafiek (v2): welke parameter heeft de grootste impact op het minimum kasaldo.</li>
+  </ul>
+</section>
+
+<!-- 8 -->
+<section>
+  <h2>8. KPI-lijst</h2>
+  <table><thead><tr><th style="width:12%">Groep</th><th style="width:26%">KPI</th><th>Definitie</th><th style="width:18%">Norm / alert</th><th style="width:6%">v</th></tr></thead><tbody>
+    <tr><td>Liquiditeit</td><td>Kasaldo vandaag</td><td>Σ vrij beschikbare saldi</td><td>&lt; buffer = rood</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Minimum kasaldo 12 / 24 mnd</td><td>Laagste kasaldo_eind + maand</td><td>&lt; buffer = oranje, &lt; 0 = rood</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Maanden tot dieptepunt</td><td>Maand minimum − nu</td><td>&lt; 6 = rood</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Cash runway</td><td>Maanden tot kasaldo &lt; 0 zonder nieuwe transacties</td><td>&lt; 12 = oranje</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Vrije ruimte 90 dagen</td><td>Kasaldo − verplichte uitgaven 90 d − buffer</td><td>&lt; 0 = rood</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Betaalbare aankoopruimte</td><td>Max. eigen inbreng die nu kan zonder buffer te raken (base én downside)</td><td>—</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Committed uitgaven 12 mnd</td><td>Σ contractuele uitgaven (KO, aanneemsom, aflossing)</td><td>—</td><td>1</td></tr>
+    <tr><td>Liquiditeit</td><td>Verwachte cash-in 12 mnd</td><td>Σ herfi + verkoop + tranches, naar zekerheid</td><td>Onzeker-aandeel &gt; 50% = oranje</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>Totale schuld</td><td>Σ uitstaand saldo</td><td>—</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>LTV portefeuille / per object</td><td>Schuld / marktwaarde</td><td>&gt; covenant − 5%-pt = oranje</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>DSCR</td><td>NOI / (rente + aflossing), 12 mnd vooruit</td><td>&lt; covenant + 0,10 = oranje</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>ICR</td><td>NOI / rente</td><td>&lt; covenant = rood</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>Gewogen gem. rente</td><td>Σ(saldo × rente) / Σ saldo</td><td>—</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>Gewogen looptijd (WAM)</td><td>Σ(saldo × resterende looptijd) / Σ saldo</td><td>&lt; 2 jaar = oranje</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>Afloop 12 mnd</td><td>Σ saldo leningen met einddatum ≤ 12 mnd</td><td>Zonder plan = rood</td><td>1</td></tr>
+    <tr><td>Financiering</td><td>Renterisico</td><td>% schuld variabel of rentevast &lt; 12 mnd</td><td>&gt; 40% = oranje</td><td>2</td></tr>
+    <tr><td>Operationeel</td><td>NOI (jaar, run-rate)</td><td>Huur − exploitatiekosten</td><td>—</td><td>1</td></tr>
+    <tr><td>Operationeel</td><td>Bezettingsgraad</td><td>Verhuurde m² / verhuurbare m² (en financieel)</td><td>&lt; 92% = oranje</td><td>1</td></tr>
+    <tr><td>Operationeel</td><td>WALT</td><td>Gewogen resterende looptijd huurcontracten</td><td>&lt; 3 jaar = oranje</td><td>2</td></tr>
+    <tr><td>Operationeel</td><td>Huurachterstand</td><td>Openstaande huur &gt; 30 d</td><td>&gt; 2% jaarhuur = oranje</td><td>2</td></tr>
+    <tr><td>Waarde</td><td>Marktwaarde</td><td>Per methode (yield/factor/taxatie)</td><td>—</td><td>2</td></tr>
+    <tr><td>Waarde</td><td>NAV</td><td>Marktwaarde − schuld</td><td>—</td><td>2</td></tr>
+    <tr><td>Waarde</td><td>Ongerealiseerde meerwaarde</td><td>Marktwaarde − kostprijs</td><td>—</td><td>2</td></tr>
+    <tr><td>Waarde</td><td>Waardegevoeligheid</td><td>Δ NAV bij yield +50 bps</td><td>—</td><td>2</td></tr>
+    <tr><td>Rendement</td><td>Bruto aanvangsrendement (BAR)</td><td>Brutohuur / kostprijs</td><td>—</td><td>2</td></tr>
+    <tr><td>Rendement</td><td>NOI-yield</td><td>NOI / marktwaarde</td><td>—</td><td>2</td></tr>
+    <tr><td>Rendement</td><td>Cash-on-cash</td><td>Operationele kasstroom / eigen vermogen ingebracht</td><td>—</td><td>2</td></tr>
+    <tr><td>Rendement</td><td>IRR project (levered / unlevered)</td><td>XIRR over werkelijke + forecast kasstromen + exitwaarde</td><td>&lt; hurdle = oranje</td><td>2</td></tr>
+    <tr><td>Rendement</td><td>MOIC</td><td>Totale ontvangsten / totale inbreng</td><td>—</td><td>2</td></tr>
+    <tr><td>Rendement</td><td>Portefeuille-IRR</td><td>XIRR geconsolideerd</td><td>—</td><td>2</td></tr>
+    <tr><td>Pipeline</td><td>Pipeline (aantal, € gewogen)</td><td>Σ koopsom × kans</td><td>—</td><td>1</td></tr>
+    <tr><td>Pipeline</td><td>Cash-behoefte pipeline 12 mnd</td><td>Σ eigen inbreng per maand</td><td>&gt; vrije ruimte = rood</td><td>1</td></tr>
+    <tr><td>Bouw</td><td>Voortgang / vertraging</td><td>% gereed; verwachte − geplande oplevering</td><td>&gt; 30 d = oranje</td><td>1</td></tr>
+    <tr><td>Bouw</td><td>Budgetuitputting</td><td>Betaald + gecommitteerd / budget</td><td>&gt; voortgang + 10%-pt = oranje</td><td>1</td></tr>
+    <tr><td>Crediteuren</td><td>Openstaand / in regeling / in aanmaning</td><td>Zie Bijlage A</td><td>Sommatie = rood</td><td>1</td></tr>
+  </tbody></table>
+</section>
+
+<!-- 9 -->
+<section>
+  <h2>9. Dashboard views per doelgroep</h2>
+  <table><thead><tr><th style="width:16%">View</th><th style="width:16%">Doelgroep</th><th>Kernvraag</th><th style="width:14%">Frequentie</th></tr></thead><tbody>
+    <tr><td>Management</td><td>Directie / DGA</td><td>Staan we er goed voor en waar moet ik nu op ingrijpen?</td><td>Wekelijks</td></tr>
+    <tr><td>Finance</td><td>CFO / controller</td><td>Klopt de cashplanning maand voor maand en zijn financieringen op tijd?</td><td>Dagelijks / wekelijks</td></tr>
+    <tr><td>Investment</td><td>Investeringsmanager</td><td>Welke aankoop past, wanneer, en wat rendeert het?</td><td>Per deal</td></tr>
+    <tr><td>Asset management</td><td>Vastgoedbeheer</td><td>Huur, leegstand, bouw en onderhoud op koers?</td><td>Wekelijks</td></tr>
+  </tbody></table>
+
+  <h3>9A — Management</h3>
+  <div class="mock">
+    <div class="mt">Management overzicht</div>
+    <div class="ms">Portefeuille · Peildatum 30-09-2026 · Alle bedragen in euro</div>
+    <div class="filters"><span class="chip on">Base</span><span class="chip">Upside</span><span class="chip">Downside</span><span class="chip">12 mnd</span><span class="chip on">24 mnd</span><span class="chip">Alle entiteiten ▾</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="kl">Kasaldo vandaag</div><div class="kv b">€ 2,84M</div><div class="kd">▲ € 124k vs vorige maand</div></div>
+      <div class="kpi"><div class="kl">Min. kasaldo 24 mnd</div><div class="kv a">€ 431k</div><div class="kd">mei 2027 · onder buffer</div></div>
+      <div class="kpi"><div class="kl">Vrije ruimte 90 d</div><div class="kv g">€ 910k</div><div class="kd">na buffer € 500k</div></div>
+      <div class="kpi"><div class="kl">DSCR</div><div class="kv g">1,42</div><div class="kd">covenant 1,20</div></div>
+      <div class="kpi"><div class="kl">LTV</div><div class="kv">58%</div><div class="kd">covenant 65%</div></div>
+      <div class="kpi"><div class="kl">Alerts</div><div class="kv r">3</div><div class="kd">2 kritiek · 1 aandacht</div></div>
+    </div>
+    <div class="ma crit"><b>Kritiek</b> — Lening Utrecht (€ 2,3M) loopt af 15-02-2027. Herfinanciering nog niet aangevraagd; uiterlijk 17-11-2026 indienen.</div>
+    <div class="ma crit"><b>Kritiek</b> — Downside: kasaldo negatief in apr 2027 (−€ 1,9M) bij 3 mnd vertraging herfinanciering Utrecht.</div>
+    <div class="ma warn"><b>Aandacht</b> — Huurcontract Rotterdam (€ 8.400/mnd) verloopt 01-01-2027; heronderhandeling starten.</div>
+    <div style="margin-top:2mm;color:#9aa5b1">Kasverloop 12 maanden (base)</div>
+    <div class="bars"><div style="height:95%"></div><div style="height:88%"></div><div style="height:34%" class="mid"></div><div style="height:32%" class="mid"></div><div style="height:36%" class="mid"></div><div style="height:27%" class="mid"></div><div style="height:19%" class="low"></div><div style="height:15%" class="low"></div><div style="height:22%" class="low"></div><div style="height:30%" class="mid"></div><div style="height:38%"></div><div style="height:44%"></div></div>
+    <div class="barlbl"><span>okt</span><span>nov</span><span>dec</span><span>jan</span><span>feb</span><span>mrt</span><span>apr</span><span>mei</span><span>jun</span><span>jul</span><span>aug</span><span>sep</span></div>
+  </div>
+  <table><thead><tr><th style="width:22%">Onderdeel</th><th>Inhoud</th></tr></thead><tbody>
+    <tr><td>KPI-tegels (max. 6)</td><td>Kasaldo vandaag, min. kasaldo 24 mnd + maand, vrije ruimte 90 d, DSCR, LTV, aantal alerts</td></tr>
+    <tr><td>Grafiek</td><td>Kasverloop 24 mnd, drie scenario's + bufferlijn; klik op maand → events in die maand</td></tr>
+    <tr><td>Top-5 cash events</td><td>Grootste in- en uitgaande events komende 6 maanden, met zekerheid</td></tr>
+    <tr><td>Alerts</td><td>Alleen kritiek + aandacht; klikbaar naar object/lening</td></tr>
+    <tr><td>Filters</td><td>Scenario, horizon (12/24/36), entiteit</td></tr>
+  </tbody></table>
+
+  <h3>9B — Finance</h3>
+  <div class="mock">
+    <div class="mt">Liquiditeit &amp; financiering</div>
+    <div class="ms">Cashflowtabel · 24 maanden · per entiteit</div>
+    <div class="filters"><span class="chip on">Base</span><span class="chip">Downside</span><span class="chip">Entiteit: alle ▾</span><span class="chip">Object: alle ▾</span><span class="chip">Event-type ▾</span><span class="chip">Zekerheid: alle ▾</span><span class="chip">⇩ Excel</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="kl">Schuld totaal</div><div class="kv">€ 7,6M</div><div class="kd">gem. rente 4,6%</div></div>
+      <div class="kpi"><div class="kl">Afloop 12 mnd</div><div class="kv r">€ 2,3M</div><div class="kd">1 lening zonder plan</div></div>
+      <div class="kpi"><div class="kl">Herfi cash-in 12 mnd</div><div class="kv g">€ 2,45M</div><div class="kd">status: gepland</div></div>
+      <div class="kpi"><div class="kl">Covenant-toets</div><div class="kv a">1 krap</div><div class="kd">DSCR Breda 1,24</div></div>
+    </div>
+    <div class="ma warn"><b>Aandacht</b> — Tranche 4 Amsterdam (€ 150k) volgt 15 dagen na bouwtermijn: tijdelijk gat € 200k in mei 2027.</div>
+    <div class="ma crit"><b>Kritiek</b> — Entiteit Project Breda BV: kasaldo onder entiteitsbuffer in mrt 2027; geen vrije cash in holding i.v.m. dividendblokkade.</div>
+  </div>
+  <table><thead><tr><th style="width:22%">Onderdeel</th><th>Inhoud</th></tr></thead><tbody>
+    <tr><td>Cashflowtabel</td><td>Maanden als kolommen, event-types als rijen (zie hoofdstuk 6); drill-down tot individueel cash event</td></tr>
+    <tr><td>Financieringskalender</td><td>Tijdlijn: afloopdata, renteherzieningen, tranches, herfinancieringen, aanvraagdeadlines</td></tr>
+    <tr><td>Schuldenoverzicht</td><td>Per lening: saldo, rente, einddatum, LTV, DSCR, covenant-marge</td></tr>
+    <tr><td>Kas per entiteit</td><td>Welke entiteit loopt eerst leeg; welke cash is vrij opneembaar</td></tr>
+    <tr><td>Maand-op-maand verschil</td><td>Forecast nu vs vorige maand: wat is er veranderd en waarom (bridge)</td></tr>
+    <tr><td>Crediteuren</td><td>Betaalregelingen en termijnen (Bijlage A)</td></tr>
+  </tbody></table>
+
+  <h3>9C — Investment</h3>
+  <div class="mock">
+    <div class="mt">Acquisitie-pipeline &amp; rendement</div>
+    <div class="ms">Wat kunnen we ons veroorloven, en wanneer?</div>
+    <div class="filters"><span class="chip">Fase ▾</span><span class="chip">Prioriteit ▾</span><span class="chip">Type ▾</span><span class="chip on">Gewogen</span><span class="chip">Ongewogen</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="kl">Pipeline gewogen</div><div class="kv">€ 6,2M</div><div class="kd">5 deals</div></div>
+      <div class="kpi"><div class="kl">Eigen inbreng 12 mnd</div><div class="kv a">€ 1,9M</div><div class="kd">gewogen € 1,2M</div></div>
+      <div class="kpi"><div class="kl">Betaalbare ruimte</div><div class="kv g">€ 650k</div><div class="kd">zonder buffer te raken (downside)</div></div>
+      <div class="kpi"><div class="kl">Portefeuille-IRR</div><div class="kv g">11,4%</div><div class="kd">levered</div></div>
+    </div>
+    <div class="ma crit"><b>Kritiek</b> — Aankoop Den Bosch (eigen inbreng € 1,45M, dec 2026) past alleen als herfinanciering Utrecht vóór passeren rond is.</div>
+    <div class="ma warn"><b>Aandacht</b> — Financieringsvoorbehoud Tilburg verloopt over 12 dagen; nog geen termsheet.</div>
+  </div>
+  <table><thead><tr><th style="width:22%">Onderdeel</th><th>Inhoud</th></tr></thead><tbody>
+    <tr><td>Pipeline-tabel</td><td>Object, fase, koopsom, eigen inbreng, passeerdatum, financieringsdeadline, kans, IRR</td></tr>
+    <tr><td>"Past het?"-toets</td><td>Per deal: effect op min. kasaldo base/downside; vroegst mogelijke passeerdatum</td></tr>
+    <tr><td>Cash-behoefte per maand</td><td>Gestapelde balken per deal vs vrije liquiditeitsruimte (lijn)</td></tr>
+    <tr><td>Rendement</td><td>IRR/MOIC per project, base vs downside; yield vs LTV-matrix</td></tr>
+  </tbody></table>
+
+  <h3>9D — Asset management</h3>
+  <table><thead><tr><th style="width:22%">Onderdeel</th><th>Inhoud</th></tr></thead><tbody>
+    <tr><td>Objectenlijst</td><td>Status, huur, bezetting, NOI, WALT, betaalgedrag</td></tr>
+    <tr><td>Huurexpiratie</td><td>Contracten die aflopen in 6/12/24 mnd, met huur en actie-eigenaar</td></tr>
+    <tr><td>Indexatieplanning</td><td>Welke contracten wanneer indexeren, verwachte huurverhoging</td></tr>
+    <tr><td>Bouwmonitor</td><td>Per project: voortgang %, budget vs besteed, geplande vs verwachte oplevering, tranches</td></tr>
+    <tr><td>Onderhoud</td><td>Begroting vs werkelijk, MJOP-reservering</td></tr>
+    <tr><td>Filters</td><td>Stad, type, status, huurder, expiratiedatum</td></tr>
+  </tbody></table>
+
+  <h3>Globale filters (alle views)</h3>
+  <table><thead><tr><th style="width:22%">Filter</th><th>Waarden</th></tr></thead><tbody>
+    <tr><td>Scenario</td><td>Base / upside / downside / custom — altijd zichtbaar bovenin</td></tr>
+    <tr><td>Horizon</td><td>3 / 12 / 24 / 36 maanden</td></tr>
+    <tr><td>Entiteit</td><td>Geconsolideerd of per BV</td></tr>
+    <tr><td>Object-status</td><td>Eigendom / ontwikkeling / bouw / acquisitie / verkoop</td></tr>
+    <tr><td>Zekerheid</td><td>Alleen contractueel / + verwacht / alles</td></tr>
+    <tr><td>Versie</td><td>Forecast van vandaag vs vorige maand</td></tr>
+  </tbody></table>
+</section>
+
+<!-- 10 -->
+<section>
+  <h2>10. MVP-scope versie 1</h2>
+  <div class="box"><b>Doel v1:</b> binnen 6–8 weken een betrouwbare 24-maanden liquiditeitsforecast met drie scenario's en alerts, die de directie wekelijks gebruikt.</div>
+  <div class="two">
+    <div>
+      <h3>Wel in v1</h3>
+      <ul>
+        <li>Entiteiten, objecten (alle statussen)</li>
+        <li>Huurcontracten met eenvoudige vaste indexatie</li>
+        <li>Exploitatiekosten met betaalritme</li>
+        <li>Leningen: annuïteit, lineair, bullet; rente vast/variabel (vaste Euribor-aanname)</li>
+        <li>Acquisities: waarborgsom, eigen inbreng, OVB, kosten, passeerdatum, kans</li>
+        <li>Bouwproject: termijnen + tranches handmatig, vertraging in maanden</li>
+        <li>Herfinanciering met LTV- én DSCR-toets</li>
+        <li>Verkoop (geheel, eenvoudig uitponden)</li>
+        <li>Kasstand per entiteit + buffers</li>
+        <li>Crediteuren en betaalregelingen</li>
+        <li>Forecast 24–36 mnd, drie scenario's (parameters in config)</li>
+        <li>Object-overrides voor vertraging</li>
+        <li>Management- en finance-view</li>
+        <li>10 kern-alerts (Bijlage B)</li>
+        <li>Export cashflowtabel naar Excel/PDF</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Niet in v1</h3>
+      <ul>
+        <li>IRR, MOIC, cash-on-cash</li>
+        <li>Yield/factor-waardering (alleen taxatiewaarde handmatig)</li>
+        <li>CPI-reeksen, cap/floor</li>
+        <li>Scenario-editor in UI</li>
+        <li>Investment- en asset management-view (alleen pipeline-tabel)</li>
+        <li>Koppelingen boekhouding/bank</li>
+        <li>Vpb-berekening</li>
+        <li>Rechtenstructuur en audit trail</li>
+        <li>E-mail/Teams-notificaties</li>
+      </ul>
+      <h3>Acceptatiecriteria</h3>
+      <ul>
+        <li>Forecast maand 1–3 wijkt &lt; 5% af van werkelijk</li>
+        <li>Alle leningen en geplande transacties ingevoerd</li>
+        <li>Maandupdate kost &lt; 1 uur</li>
+        <li>Directie gebruikt het in het wekelijkse overleg</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Planning v1</h3>
+  <table><thead><tr><th style="width:14%">Week</th><th>Activiteit</th><th style="width:26%">Resultaat</th></tr></thead><tbody>
+    <tr><td>1</td><td>Data verzamelen: leningen, kasstand, objecten, geplande transacties</td><td>Gevulde invoertemplates</td></tr>
+    <tr><td>2–3</td><td>Rekenkern: event-generator, leningschema's, forecast</td><td>Forecast base klopt met handmatige check</td></tr>
+    <tr><td>4</td><td>Scenario's + overrides + alerts</td><td>Drie scenario's, alertlijst</td></tr>
+    <tr><td>5–6</td><td>Management- en finance-view, export</td><td>Werkend dashboard</td></tr>
+    <tr><td>7–8</td><td>Parallel draaien met huidige planning, bijstellen</td><td>Go-live</td></tr>
+  </tbody></table>
+</section>
+
+<!-- 11 -->
+<section>
+  <h2>11. Roadmap versie 2 en 3</h2>
+  <table><thead><tr><th style="width:12%">Versie</th><th style="width:22%">Thema</th><th>Functionaliteit</th><th style="width:14%">Termijn</th></tr></thead><tbody>
+    <tr><td><b>v2</b></td><td>Waarde</td><td>Yield (BAR/NAR) en factor-waardering; waarde in de tijd; NAV-ontwikkeling; gevoeligheid yield ±50 bps</td><td>Mnd 3–6</td></tr>
+    <tr><td>v2</td><td>Rendement</td><td>IRR (levered/unlevered), MOIC, cash-on-cash per project en portefeuille; hurdle-toets</td><td>Mnd 3–6</td></tr>
+    <tr><td>v2</td><td>Indexatie</td><td>CPI-reeksen, cap/floor, bouwkostenindex, Euribor-curve</td><td>Mnd 3–6</td></tr>
+    <tr><td>v2</td><td>Scenario's</td><td>Scenario-editor, custom scenario's, stress events, tornado-analyse, break-even vertraging</td><td>Mnd 4–7</td></tr>
+    <tr><td>v2</td><td>Views</td><td>Investment- en asset management-view volledig</td><td>Mnd 4–7</td></tr>
+    <tr><td>v2</td><td>Covenants</td><td>Covenant-tabel met testmomenten, voorspelde breuk per kwartaal</td><td>Mnd 4–7</td></tr>
+    <tr><td><b>v3</b></td><td>Integraties</td><td>Boekhouding (Exact/Twinfield/AFAS) voor werkelijke cijfers; bank (PSD2) voor saldi</td><td>Mnd 7–12</td></tr>
+    <tr><td>v3</td><td>Actual vs forecast</td><td>Automatische vergelijking werkelijk vs begroot, variance-analyse</td><td>Mnd 7–12</td></tr>
+    <tr><td>v3</td><td>What-if simulator</td><td>Datum van een event slepen op een tijdlijn → alle KPI's direct herberekend</td><td>Mnd 7–12</td></tr>
+    <tr><td>v3</td><td>Notificaties</td><td>E-mail/Teams bij nieuwe kritieke alert; wekelijkse PDF-rapportage</td><td>Mnd 7–12</td></tr>
+    <tr><td>v3</td><td>Governance</td><td>Rollen (directie, finance, AM, lezer), audit trail, forecast-versies bevriezen</td><td>Mnd 9–15</td></tr>
+    <tr><td>v3</td><td>Fiscaal</td><td>Vpb, fiscale eenheid, latente belasting in NAV</td><td>Mnd 9–15</td></tr>
+    <tr><td>v3</td><td>Rapportage</td><td>Bankrapportages en investeerdersrapportage uit het systeem</td><td>Mnd 9–15</td></tr>
+  </tbody></table>
+</section>
+
+<!-- 12 -->
+<section>
+  <h2>12. Technische architectuur</h2>
+  <table><thead><tr><th style="width:16%">Criterium</th><th>A · Spreadsheet-prototype</th><th>B · Database + dashboardtool</th><th>C · Maatwerk webapp</th></tr></thead><tbody>
+    <tr><td>Voorbeeld</td><td>Excel / Google Sheets</td><td>Airtable/NocoDB + Python-engine + Power BI/Metabase</td><td>PostgreSQL + Python (FastAPI) + React/Next.js</td></tr>
+    <tr><td>Tijd tot eerste versie</td><td>2–3 weken</td><td>6–10 weken</td><td>3–6 maanden</td></tr>
+    <tr><td>Kosten</td><td>Laag</td><td>€ 300–1.500 p/m tooling + bouw</td><td>Hoog (bouw + onderhoud)</td></tr>
+    <tr><td>Scenario's</td><td>Beperkt (kopieën van tabbladen)</td><td>Goed (engine rekent alle scenario's)</td><td>Uitstekend, realtime</td></tr>
+    <tr><td>Afhankelijkheden/vertraging</td><td>Foutgevoelig</td><td>Goed</td><td>Uitstekend</td></tr>
+    <tr><td>Samenwerken/rechten</td><td>Zwak</td><td>Goed</td><td>Volledig</td></tr>
+    <tr><td>Audit trail</td><td>Nee</td><td>Deels</td><td>Ja</td></tr>
+    <tr><td>Schaal</td><td>&lt; 15 objecten</td><td>&lt; 200 objecten</td><td>Onbeperkt</td></tr>
+    <tr><td>Grootste risico</td><td>Formulefouten, versiechaos</td><td>Tooling-afhankelijkheid</td><td>Te vroeg bouwen, proces nog niet stabiel</td></tr>
+  </tbody></table>
+
+  <h3>Advies</h3>
+  <div class="box">
+    <b>Start met een lichte webapp met gescheiden data en rekenkern — geen Excel met formules.</b> Het bestaande dashboard (HTML + JavaScript met een <code>data.js</code> invoerbestand en een <code>engine.js</code> rekenkern) is hier al een goede basis voor: het draait zonder server, is snel aan te passen en de rekenregels staan op één plek.
+  </div>
+  <table><thead><tr><th style="width:16%">Fase</th><th>Architectuur</th><th style="width:28%">Overstappen als…</th></tr></thead><tbody>
+    <tr><td>Nu (v1)</td><td>Statische webapp: invoer in <code>data.js</code> (of Excel-import), rekenkern in JavaScript, dashboards met Chart.js. Hosting via GitHub Pages/Vercel met toegangsbeveiliging.</td><td>meer dan 2 mensen tegelijk data invoeren</td></tr>
+    <tr><td>v2</td><td>Database (Supabase/PostgreSQL) met invoerformulieren; dezelfde rekenkern draait in de browser of als serverfunctie; login per gebruiker.</td><td>koppelingen en audit trail nodig zijn</td></tr>
+    <tr><td>v3</td><td>Backend-service voor forecast (Python of TypeScript), geplande runs, notificaties, koppelingen boekhouding/bank, rollen.</td><td>—</td></tr>
+  </table>
+
+  <h3>Ontwerpprincipes voor de rekenkern</h3>
+  <ul>
+    <li><b>Invoer ≠ berekening:</b> gebruikers wijzigen nooit berekende velden.</li>
+    <li><b>Alles is een cash event:</b> herleidbaar van KPI → maand → event → afspraak.</li>
+    <li><b>Deterministisch en getest:</b> elke business rule heeft een testgeval met verwachte uitkomst.</li>
+    <li><b>Versies:</b> elke maand een bevroren forecast bewaren om te vergelijken.</li>
+    <li><b>Conservatief standaard:</b> aflopende lening zonder plan = aflossing; onzekere cash-in niet meetellen in downside.</li>
+  </ul>
+
+  <h3>Wat nodig is om te starten</h3>
+  <table><thead><tr><th style="width:6%">#</th><th style="width:24%">Data</th><th>Minimaal per record</th></tr></thead><tbody>
+    <tr><td>1</td><td>Kasstand</td><td>Saldo per entiteit/rekening op peildatum, geblokkeerde bedragen</td></tr>
+    <tr><td>2</td><td>Leningen</td><td>Geldgever, saldo, rente, aflossingstype en -bedrag, einddatum, covenants</td></tr>
+    <tr><td>3</td><td>Objecten &amp; huur</td><td>Naam, status, huur per maand, einddatum contract, exploitatiekosten</td></tr>
+    <tr><td>4</td><td>Geplande aankopen</td><td>Koopsom, eigen inbreng, waarborgsom, passeerdatum, financiering</td></tr>
+    <tr><td>5</td><td>Bouw</td><td>Termijnschema aannemer, tranches, eigen inbreng bouw, opleverdatum</td></tr>
+    <tr><td>6</td><td>Herfinanciering/verkoop</td><td>Verwachte datum, waarde, LTV, kosten</td></tr>
+    <tr><td>7</td><td>Crediteuren</td><td>Openstaande posten en betaalregelingen</td></tr>
+  </tbody></table>
+  <p class="small">Met 1, 2, 4 en 6 is al ± 80% van het liquiditeitsinzicht beschikbaar.</p>
+</section>
+
+<!-- Bijlage A -->
+<section>
+  <h2>Bijlage A — Module crediteuren &amp; betaalregelingen</h2>
+  <p>Losse pagina in het dashboard, volledig handmatig invoerbaar. Termijnen van betaalregelingen en verwachte betalingen van openstaande posten worden cash events in de forecast (type <code>crediteur</code>).</p>
+
+  <h3>Velden per crediteur</h3>
+  <table><thead><tr><th style="width:18%">Groep</th><th style="width:28%">Veld</th><th style="width:14%">Type</th><th>Toelichting</th></tr></thead><tbody>
+    <tr><td rowspan="6"><b>Basisgegevens</b></td><td><code>naam</code></td><td>tekst</td><td>Naam crediteur</td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>leverancier / aannemer / overheid / bank / overig</td></tr>
+    <tr><td><code>entiteit_id</code>, <code>object_id</code></td><td>FK</td><td>Welke BV / welk object</td></tr>
+    <tr><td><code>openstaand_bedrag</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>factuurdatum</code></td><td>datum</td><td>Originele factuurdatum</td></tr>
+    <tr><td><code>vervaldatum</code></td><td>datum</td><td>Vervaldatum originele factuur</td></tr>
+    <tr><td rowspan="3"><b>Aanmaning</b></td><td><code>aanmaningsstatus</code></td><td>enum</td><td>geen / 1e aanmaning / 2e aanmaning / sommatie / juridisch</td></tr>
+    <tr><td><code>datum_laatste_aanmaning</code></td><td>datum</td><td></td></tr>
+    <tr><td><code>contactpersoon</code></td><td>tekst</td><td>Naam, telefoon, e-mail</td></tr>
+    <tr><td rowspan="8"><b>Betaalregeling</b></td><td><code>regeling</code></td><td>ja/nee</td><td>Betaalregeling getroffen?</td></tr>
+    <tr><td><code>totaalbedrag_regeling</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>termijnbedrag</code></td><td>euro</td><td></td></tr>
+    <tr><td><code>frequentie</code></td><td>enum</td><td>wekelijks / maandelijks / kwartaal</td></tr>
+    <tr><td><code>startdatum</code>, <code>einddatum</code></td><td>datum</td><td></td></tr>
+    <tr><td><code>volgende_betaaldatum</code></td><td>datum</td><td>Berekend uit start + frequentie − betaalde termijnen</td></tr>
+    <tr><td><code>betaald_tm</code></td><td>datum</td><td>Laatste betaalde termijn</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td>lopend / achter / afgerond</td></tr>
+  </tbody></table>
+
+  <h3>KPI's bovenaan de pagina</h3>
+  <table><thead><tr><th style="width:34%">KPI</th><th>Berekening</th></tr></thead><tbody>
+    <tr><td>Totaal openstaand bij crediteuren</td><td>Σ openstaand_bedrag</td></tr>
+    <tr><td>Waarvan in betaalregeling</td><td>Σ resterend bedrag waar regeling = ja</td></tr>
+    <tr><td>Waarvan in aanmaning / sommatie</td><td>Σ openstaand waar aanmaningsstatus ≠ geen</td></tr>
+    <tr><td>Volgende betalingen deze maand</td><td>Σ termijnen met betaaldatum in huidige maand</td></tr>
+    <tr><td>Achterstallige termijnen</td><td>Aantal en bedrag termijnen met betaaldatum &lt; vandaag en niet betaald</td></tr>
+  </tbody></table>
+
+  <h3>Business rules</h3>
+  <ul>
+    <li>Regeling = ja → elke termijn tussen <code>volgende_betaaldatum</code> en <code>einddatum</code> wordt een cash event.</li>
+    <li>Regeling = nee → openstaand bedrag als uitgave op vervaldatum; als die verstreken is: in de huidige maand (conservatief).</li>
+    <li>Status "achter" automatisch als <code>volgende_betaaldatum</code> &lt; vandaag.</li>
+    <li>Status "afgerond" als som betaalde termijnen ≥ totaalbedrag.</li>
+  </ul>
+
+  <h3>Voorbeeldoverzicht</h3>
+  <table><thead><tr><th>Crediteur</th><th>Type</th><th>Openstaand</th><th>Aanmaning</th><th>Regeling</th><th>Termijn</th><th>Volgende</th><th>Status</th></tr></thead><tbody>
+    <tr><td>Bouwbedrijf De Vries</td><td>aannemer</td><td>€ 84.000</td><td>—</td><td>ja</td><td>€ 14.000 / mnd</td><td>01-10-2026</td><td><span class="tag info">lopend</span></td></tr>
+    <tr><td>Belastingdienst</td><td>overheid</td><td>€ 36.500</td><td>—</td><td>ja</td><td>€ 3.050 / mnd</td><td>28-09-2026</td><td><span class="tag warn">binnen 7 d</span></td></tr>
+    <tr><td>Installatiebedrijf Noord</td><td>leverancier</td><td>€ 12.400</td><td>2e aanmaning</td><td>nee</td><td>—</td><td>vervallen 15-08</td><td><span class="tag crit">achter</span></td></tr>
+    <tr><td>Gemeente Breda (OZB)</td><td>overheid</td><td>€ 8.900</td><td>—</td><td>nee</td><td>—</td><td>31-10-2026</td><td><span class="tag info">open</span></td></tr>
+  </tbody></table>
+
+  <h3>Alerts crediteuren</h3>
+  <div class="alert warn"><b>Aandacht</b> Termijnbetaling Belastingdienst (€ 3.050) vervalt binnen 7 dagen (28-09-2026).</div>
+  <div class="alert crit"><b>Kritiek</b> Installatiebedrijf Noord: 2e aanmaning, € 12.400 vervallen sinds 15-08-2026 — risico op sommatie.</div>
+  <div class="alert crit"><b>Kritiek</b> Termijn betaalregeling gemist → regeling "achter"; risico dat de volledige vordering opeisbaar wordt.</div>
+</section>
+
+<!-- Bijlage B -->
+<section>
+  <h2>Bijlage B — Alertcatalogus</h2>
+  <table><thead><tr><th style="width:5%">#</th><th style="width:25%">Alert</th><th>Trigger</th><th style="width:11%">Niveau</th><th style="width:13%">Doelgroep</th><th style="width:5%">v</th></tr></thead><tbody>
+    <tr><td>1</td><td>Kastekort voorspeld</td><td>kasaldo_eind &lt; 0 in enige maand binnen horizon (per scenario)</td><td><span class="tag crit">kritiek</span></td><td>Mgmt, Finance</td><td>1</td></tr>
+    <tr><td>2</td><td>Onder kasbuffer</td><td>kasaldo_eind &lt; min_kasbuffer binnen 12 mnd (base)</td><td><span class="tag warn">aandacht</span></td><td>Mgmt, Finance</td><td>1</td></tr>
+    <tr><td>3</td><td>Lening loopt af zonder plan</td><td>einddatum ≤ 12 mnd en geen herfinanciering met status ≥ aangevraagd</td><td><span class="tag crit">kritiek</span></td><td>Finance</td><td>1</td></tr>
+    <tr><td>4</td><td>Aanvraagdeadline herfinanciering</td><td>vandaag ≥ aanvraag_uiterlijk − 30 d en status = gepland</td><td><span class="tag warn">aandacht</span> → <span class="tag crit">kritiek</span> na deadline</td><td>Finance</td><td>1</td></tr>
+    <tr><td>5</td><td>Financiering aankoop niet rond</td><td>passeerdatum ≤ 60 d en lening status &lt; toegezegd</td><td><span class="tag crit">kritiek</span></td><td>Investment, Finance</td><td>1</td></tr>
+    <tr><td>6</td><td>Financieringsvoorbehoud verloopt</td><td>voorbehoud_datum ≤ 14 d en geen termsheet</td><td><span class="tag warn">aandacht</span></td><td>Investment</td><td>1</td></tr>
+    <tr><td>7</td><td>Aankoop niet betaalbaar</td><td>met deze aankoop komt min. kasaldo (downside) onder buffer</td><td><span class="tag warn">aandacht</span></td><td>Investment, Mgmt</td><td>1</td></tr>
+    <tr><td>8</td><td>Bouwvertraging</td><td>verwachte − geplande oplevering &gt; 30 d</td><td><span class="tag warn">aandacht</span></td><td>AM, Finance</td><td>1</td></tr>
+    <tr><td>9</td><td>Tranche-gat</td><td>bouwtermijn betaald vóór tranche-opname en kas tijdelijk onder buffer</td><td><span class="tag warn">aandacht</span></td><td>Finance</td><td>1</td></tr>
+    <tr><td>10</td><td>Covenant krap / breuk</td><td>DSCR &lt; covenant + 0,10 (krap) of &lt; covenant (breuk) in forecast</td><td><span class="tag warn">aandacht</span> / <span class="tag crit">kritiek</span></td><td>Finance, Mgmt</td><td>1</td></tr>
+    <tr><td>11</td><td>Huurcontract verloopt</td><td>einddatum ≤ 6 mnd zonder verlenging</td><td><span class="tag warn">aandacht</span></td><td>AM</td><td>1</td></tr>
+    <tr><td>12</td><td>Crediteur-termijn binnen 7 dagen</td><td>volgende_betaaldatum ≤ vandaag + 7</td><td><span class="tag warn">aandacht</span></td><td>Finance</td><td>1</td></tr>
+    <tr><td>13</td><td>Crediteur achter / sommatie</td><td>status = achter of aanmaningsstatus ≥ sommatie</td><td><span class="tag crit">kritiek</span></td><td>Finance, Mgmt</td><td>1</td></tr>
+    <tr><td>14</td><td>Renteherziening</td><td>rentevast_tot ≤ 6 mnd</td><td><span class="tag info">info</span></td><td>Finance</td><td>1</td></tr>
+    <tr><td>15</td><td>Forecast verslechterd</td><td>min. kasaldo daalt &gt; € 250k t.o.v. vorige maandversie</td><td><span class="tag warn">aandacht</span></td><td>Mgmt, Finance</td><td>2</td></tr>
+    <tr><td>16</td><td>LTV-covenant bij yield-shift</td><td>LTV &gt; covenant bij yield +50 bps</td><td><span class="tag warn">aandacht</span></td><td>Finance</td><td>2</td></tr>
+    <tr><td>17</td><td>IRR onder hurdle</td><td>project-IRR (base) &lt; hurdle rate</td><td><span class="tag info">info</span></td><td>Investment</td><td>2</td></tr>
+  </tbody></table>
+
+  <h3>Opbouw van een alert</h3>
+  <table><thead><tr><th style="width:24%">Veld</th><th>Voorbeeld</th></tr></thead><tbody>
+    <tr><td>Niveau</td><td>Kritiek</td></tr>
+    <tr><td>Wat</td><td>Lening Utrecht (€ 2,3M) loopt af op 15-02-2027</td></tr>
+    <tr><td>Waarom belangrijk</td><td>Zonder herfinanciering daalt kasaldo naar −€ 1,9M in feb 2027</td></tr>
+    <tr><td>Actie + deadline</td><td>Herfinancieringsaanvraag indienen uiterlijk 17-11-2026 (doorlooptijd 10–12 weken)</td></tr>
+    <tr><td>Eigenaar</td><td>CFO</td></tr>
+    <tr><td>Link</td><td>→ lening Utrecht · → herfinanciering Utrecht · → kasverloop feb 2027</td></tr>
+  </tbody></table>
+</section>
+
+</body>
+</html>
